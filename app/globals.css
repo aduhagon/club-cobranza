@@ -445,6 +445,53 @@ tr:hover td { background: var(--surface-2); }
 .logo-actions { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .logo-actions input[type="file"] { display: none; }
 
+/* === TABS === */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.tabs button {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 16px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabs button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.tabs button.tab-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background: transparent;
+}
+
+/* === DETAILS/SUMMARY === */
+details summary {
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+details summary::before {
+  content: '▶';
+  font-size: 10px;
+  color: var(--text-3);
+  transition: transform 0.15s;
+}
+details[open] summary::before {
+  transform: rotate(90deg);
+}
+
 @media (max-width: 768px) {
   .menu-btn { display: inline-flex; }
   .layout { flex-direction: column; }
