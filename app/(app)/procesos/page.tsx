@@ -74,9 +74,11 @@ function DevengamientoMasivo({ yo }: { yo: Usuario }) {
     aGenerar: number;
     sinTipo: number;
     sinValor: number;
+    noVigentes: number;
     detalle: Array<{ socio: Socio; tipo: TipoCuota; importe: number }>;
     sinTipoLista: Socio[];
     sinValorLista: Array<{ socio: Socio; tipo: TipoCuota }>;
+    noVigentesLista: Socio[];
   } | null>(null);
 
   async function calcular() {
@@ -100,12 +102,33 @@ function DevengamientoMasivo({ yo }: { yo: Usuario }) {
     let aGenerar = 0;
     let sinTipo = 0;
     let sinValor = 0;
+    let noVigentes = 0;
     const detalle: typeof resumen extends infer R ? R extends { detalle: infer D } ? D : never : never = [] as any;
     const sinTipoLista: Socio[] = [];
     const sinValorLista: Array<{ socio: Socio; tipo: TipoCuota }> = [];
+    const noVigentesLista: Socio[] = [];
 
     for (const socio of socios) {
       if (yaDevengados.has(socio.id)) continue;
+
+      // Validar que el período sea >= mes de alta del socio
+      // (el socio.fecha_alta es 'YYYY-MM-DD', el periodo es 'YYYY-MM')
+      const mesAlta = socio.fecha_alta ? socio.fecha_alta.slice(0, 7) : null;
+      if (mesAlta && periodo < mesAlta) {
+        noVigentes++;
+        noVigentesLista.push(socio);
+        continue;
+      }
+
+      // Validar que el período sea <= mes de baja (si tuviera baja con fecha futura)
+      if (socio.fecha_baja) {
+        const mesBaja = socio.fecha_baja.slice(0, 7);
+        if (periodo > mesBaja) {
+          noVigentes++;
+          noVigentesLista.push(socio);
+          continue;
+        }
+      }
 
       if (!socio.tipo_cuota_id) {
         sinTipo++;
@@ -136,9 +159,11 @@ function DevengamientoMasivo({ yo }: { yo: Usuario }) {
       aGenerar,
       sinTipo,
       sinValor,
+      noVigentes,
       detalle,
       sinTipoLista,
       sinValorLista,
+      noVigentesLista,
     });
     setCalculando(false);
   }
@@ -227,13 +252,14 @@ function DevengamientoMasivo({ yo }: { yo: Usuario }) {
             </div>
             <div className="stat">
               <div className="stat-label">No se pueden</div>
-              <div className="stat-value danger">{resumen.sinTipo + resumen.sinValor}</div>
+              <div className="stat-value danger">{resumen.sinTipo + resumen.sinValor + resumen.noVigentes}</div>
             </div>
           </div>
 
-          {(resumen.sinTipo > 0 || resumen.sinValor > 0) && (
+          {(resumen.sinTipo > 0 || resumen.sinValor > 0 || resumen.noVigentes > 0) && (
             <div className="banner warning">
-              <strong>Atención:</strong> {resumen.sinTipo + resumen.sinValor} socios no podrán recibir devengamiento.
+              <strong>Atención:</strong> {resumen.sinTipo + resumen.sinValor + resumen.noVigentes} socios no podrán recibir devengamiento.
+              {resumen.noVigentes > 0 && <div style={{ marginTop: 4 }}>• {resumen.noVigentes} no vigentes en {fmtMesLargo(periodo)} (alta posterior o baja anterior a ese mes)</div>}
               {resumen.sinTipo > 0 && <div style={{ marginTop: 4 }}>• {resumen.sinTipo} sin tipo de cuota asignado</div>}
               {resumen.sinValor > 0 && <div>• {resumen.sinValor} con tipo asignado pero sin valor cargado para {fmtMesLargo(periodo)}</div>}
             </div>
@@ -264,6 +290,21 @@ function DevengamientoMasivo({ yo }: { yo: Usuario }) {
                 <strong>Total a devengar: {fmtMoney(resumen.detalle.reduce((s, d) => s + d.importe, 0))}</strong>
               </div>
             </div>
+          )}
+
+          {resumen.noVigentesLista.length > 0 && (
+            <details className="card">
+              <summary style={{ cursor: 'pointer', fontWeight: 500 }}>Socios no vigentes en {fmtMesLargo(periodo)} ({resumen.noVigentesLista.length})</summary>
+              <ul style={{ marginTop: 8, marginLeft: 24, fontSize: 13 }}>
+                {resumen.noVigentesLista.map((s) => (
+                  <li key={s.id}>
+                    #{s.numero} - {s.nombre}
+                    {s.fecha_alta && <span style={{ color: 'var(--text-3)' }}> · alta: {s.fecha_alta.slice(0, 7)}</span>}
+                    {s.fecha_baja && <span style={{ color: 'var(--text-3)' }}> · baja: {s.fecha_baja.slice(0, 7)}</span>}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
 
           {resumen.sinTipoLista.length > 0 && (
