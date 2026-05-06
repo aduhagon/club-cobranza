@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/components/Toast';
+import { darkenHex, hexToBg } from '@/lib/utils';
+import type { Club } from '@/lib/types';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +14,23 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [club, setClub] = useState<Club | null>(null);
+
+  useEffect(() => {
+    async function loadClub() {
+      const { data } = await supabase.from('clubes').select('*').limit(1).maybeSingle();
+      if (data) {
+        setClub(data as Club);
+        if ((data as Club).color_primario) {
+          const root = document.documentElement;
+          root.style.setProperty('--primary', (data as Club).color_primario!);
+          root.style.setProperty('--primary-dark', darkenHex((data as Club).color_primario!, 18));
+          root.style.setProperty('--primary-bg', hexToBg((data as Club).color_primario!, 0.10));
+        }
+      }
+    }
+    loadClub();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +48,12 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <form className="login-box" onSubmit={handleSubmit}>
-        <h1>Cobranza Club</h1>
+        {club?.logo_url && (
+          <div className="login-logo">
+            <img src={club.logo_url} alt="Logo" />
+          </div>
+        )}
+        <h1>{club?.nombre || 'Cobranza Club'}</h1>
         <div className="field">
           <label>Email</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />

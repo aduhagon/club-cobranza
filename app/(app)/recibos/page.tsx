@@ -202,6 +202,7 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
   const [periodos, setPeriodos] = useState<string[]>([]);
   const [tipoCuotaNombre, setTipoCuotaNombre] = useState<string | undefined>();
   const [loadingDet, setLoadingDet] = useState(true);
+  const [descargando, setDescargando] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -225,10 +226,17 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
 
   if (!suc || !socio) return null;
 
-  function descargarPDF() {
+  async function descargarPDF() {
     if (!suc || !socio) return;
-    descargarReciboPDF({ pago, sucursal: suc, socio, club, periodos, tipoCuotaNombre });
-    toast.success('PDF descargado');
+    setDescargando(true);
+    try {
+      await descargarReciboPDF({ pago, sucursal: suc, socio, club, periodos, tipoCuotaNombre });
+      toast.success('PDF descargado');
+    } catch (err: any) {
+      toast.error('Error generando PDF: ' + (err.message || err));
+    } finally {
+      setDescargando(false);
+    }
   }
 
   function enviarWhatsapp() {
@@ -265,7 +273,7 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
             }}>Anular</button>
           )}
           <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button onClick={descargarPDF}>📄 PDF</button>
+            <button onClick={descargarPDF} disabled={descargando}>{descargando ? '...' : '📄 PDF'}</button>
             {!pago.anulado && <button onClick={enviarWhatsapp}>WhatsApp</button>}
             <button className="primary" onClick={onClose}>Cerrar</button>
           </div>

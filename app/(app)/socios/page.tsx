@@ -114,7 +114,6 @@ export default function SociosPage() {
           <div className="empty">Sin socios</div>
         ) : (
           <>
-            {/* Desktop tabla */}
             <table className="desktop-only">
               <thead>
                 <tr>
@@ -148,7 +147,6 @@ export default function SociosPage() {
                 ))}
               </tbody>
             </table>
-            {/* Mobile cards */}
             <div className="mobile-only" style={{ padding: 8 }}>
               {filtered.map((s) => (
                 <div key={s.id} className="socio-card">

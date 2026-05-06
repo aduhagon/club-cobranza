@@ -11,19 +11,55 @@ interface ReciboData {
   tipoCuotaNombre?: string;
 }
 
-export function generarReciboPDF(data: ReciboData): jsPDF {
-  const doc = new jsPDF({ unit: 'mm', format: [80, 200] });
-  const ancho = 80;
-  let y = 8;
+// Carga una imagen y la convierte a base64 dataURL para jsPDF
+async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; type: 'PNG' | 'JPEG' } | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const type: 'PNG' | 'JPEG' = blob.type.includes('png') ? 'PNG' : 'JPEG';
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve({ dataUrl: reader.result as string, type });
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
-  doc.setFontSize(13);
+export async function generarReciboPDF(data: ReciboData): Promise<jsPDF> {
+  const doc = new jsPDF({ unit: 'mm', format: [80, 220] });
+  const ancho = 80;
+  let y = 6;
+
+  // Logo del club si existe
+  if (data.club.logo_url) {
+    const img = await loadImageAsDataUrl(data.club.logo_url);
+    if (img) {
+      const logoSize = 18;
+      try {
+        doc.addImage(img.dataUrl, img.type, (ancho - logoSize) / 2, y, logoSize, logoSize);
+        y += logoSize + 2;
+      } catch {
+        // Si falla la carga del logo, sigue sin él
+      }
+    }
+  }
+
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(data.club.nombre.toUpperCase(), ancho / 2, y, { align: 'center' });
   y += 5;
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  if (data.club.direccion) { doc.text(data.club.direccion, ancho / 2, y, { align: 'center' }); y += 4; }
+  if (data.club.direccion) {
+    const lines = doc.splitTextToSize(data.club.direccion, ancho - 8);
+    doc.text(lines, ancho / 2, y, { align: 'center' });
+    y += 4 * lines.length;
+  }
   if (data.club.contacto) { doc.text(data.club.contacto, ancho / 2, y, { align: 'center' }); y += 4; }
   if (data.club.cuit) { doc.text('CUIT: ' + data.club.cuit, ancho / 2, y, { align: 'center' }); y += 4; }
 
@@ -91,8 +127,8 @@ export function generarReciboPDF(data: ReciboData): jsPDF {
   return doc;
 }
 
-export function descargarReciboPDF(data: ReciboData): void {
-  const doc = generarReciboPDF(data);
+export async function descargarReciboPDF(data: ReciboData): Promise<void> {
+  const doc = await generarReciboPDF(data);
   const numRecibo = formatNumeroRecibo(data.sucursal.codigo, data.pago.numero);
   doc.save(`Recibo-${numRecibo}.pdf`);
 }

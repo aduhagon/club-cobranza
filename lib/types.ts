@@ -15,6 +15,8 @@ export interface Club {
   direccion: string | null;
   cuit: string | null;
   contacto: string | null;
+  logo_url: string | null;
+  color_primario: string | null;
 }
 
 export interface Sucursal {

@@ -49,7 +49,6 @@ export default async function DashboardPage() {
           <div className="empty">Aún no hay cobros registrados</div>
         ) : (
           <>
-            {/* Desktop: tabla */}
             <table className="desktop-only">
               <thead>
                 <tr><th>Recibo</th><th>Fecha</th><th>Socio</th><th>Cobrador</th><th>Importe</th></tr>
@@ -69,7 +68,6 @@ export default async function DashboardPage() {
                 })}
               </tbody>
             </table>
-            {/* Mobile: cards */}
             <div className="mobile-only">
               {recientes.map((p) => {
                 const codigo = sucursalesMap.get(p.sucursal_id) || '?';

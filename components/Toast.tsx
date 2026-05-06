@@ -22,7 +22,6 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    // Fallback si no está dentro del provider (no debería pasar)
     return {
       show: (m: string) => alert(m),
       success: (m: string) => alert(m),

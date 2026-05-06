@@ -49,8 +49,29 @@ export function simpleHash(str: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(13, '0');
 }
 
-// Normaliza texto para búsqueda (quita acentos, mayúsculas, espacios extra)
 export function normalize(s: string): string {
   if (!s) return '';
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+// Convierte HEX a RGB y devuelve un color "oscurecido" para hover
+export function darkenHex(hex: string, percent: number = 15): string {
+  const cleaned = hex.replace('#', '');
+  const r = parseInt(cleaned.substring(0, 2), 16);
+  const g = parseInt(cleaned.substring(2, 4), 16);
+  const b = parseInt(cleaned.substring(4, 6), 16);
+  const factor = (100 - percent) / 100;
+  const newR = Math.max(0, Math.floor(r * factor));
+  const newG = Math.max(0, Math.floor(g * factor));
+  const newB = Math.max(0, Math.floor(b * factor));
+  return '#' + [newR, newG, newB].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+// Convierte HEX a RGB con un componente alpha bajo (para fondos suaves)
+export function hexToBg(hex: string, alpha: number = 0.12): string {
+  const cleaned = hex.replace('#', '');
+  const r = parseInt(cleaned.substring(0, 2), 16);
+  const g = parseInt(cleaned.substring(2, 4), 16);
+  const b = parseInt(cleaned.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

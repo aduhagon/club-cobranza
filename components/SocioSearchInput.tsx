@@ -19,7 +19,6 @@ export default function SocioSearchInput({ socios, selectedId, onSelect, placeho
 
   const selectedSocio = socios.find((s) => s.id === selectedId);
 
-  // Cuando cambia la selección desde afuera, sincronizo el query
   useEffect(() => {
     if (selectedSocio && !open) {
       setQuery(`${selectedSocio.numero} - ${selectedSocio.nombre}`);
@@ -28,7 +27,6 @@ export default function SocioSearchInput({ socios, selectedId, onSelect, placeho
     }
   }, [selectedId]);
 
-  // Cierre al click afuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {

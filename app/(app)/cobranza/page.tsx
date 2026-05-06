@@ -101,11 +101,8 @@ export default function CobranzaPage() {
   }
 
   function toggleAll() {
-    if (seleccionadas.length === deudas.length) {
-      setSeleccionadas([]);
-    } else {
-      setSeleccionadas(deudas.map((d) => d.id));
-    }
+    if (seleccionadas.length === deudas.length) setSeleccionadas([]);
+    else setSeleccionadas(deudas.map((d) => d.id));
   }
 
   async function generarDeudaSiNoTiene() {
@@ -306,13 +303,21 @@ export default function CobranzaPage() {
 
 function ReciboGeneradoModal({ recibo, club, onClose }: { recibo: ReciboGenerado; club: Club; onClose: () => void }) {
   const toast = useToast();
+  const [descargando, setDescargando] = useState(false);
 
-  function descargarPDF() {
-    descargarReciboPDF({
-      pago: recibo.pago, sucursal: recibo.sucursal, socio: recibo.socio, club,
-      periodos: recibo.periodos, tipoCuotaNombre: recibo.tipoCuotaNombre,
-    });
-    toast.success('PDF descargado');
+  async function descargarPDF() {
+    setDescargando(true);
+    try {
+      await descargarReciboPDF({
+        pago: recibo.pago, sucursal: recibo.sucursal, socio: recibo.socio, club,
+        periodos: recibo.periodos, tipoCuotaNombre: recibo.tipoCuotaNombre,
+      });
+      toast.success('PDF descargado');
+    } catch (err: any) {
+      toast.error('Error generando PDF: ' + (err.message || err));
+    } finally {
+      setDescargando(false);
+    }
   }
 
   function enviarWhatsapp() {
@@ -342,7 +347,7 @@ function ReciboGeneradoModal({ recibo, club, onClose }: { recibo: ReciboGenerado
           periodos={recibo.periodos} tipoCuotaNombre={recibo.tipoCuotaNombre}
         />
         <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>
-          <button onClick={descargarPDF}>📄 Descargar PDF</button>
+          <button onClick={descargarPDF} disabled={descargando}>{descargando ? 'Generando...' : '📄 Descargar PDF'}</button>
           <button onClick={enviarWhatsapp}>WhatsApp</button>
           <button className="primary" onClick={onClose}>Listo</button>
         </div>
