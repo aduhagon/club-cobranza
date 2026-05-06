@@ -30,6 +30,13 @@ interface ReciboGenerado {
   tipoCuotaNombre?: string;
 }
 
+// Calcula el siguiente mes a partir de un período "YYYY-MM"
+function siguienteMes(periodo: string): string {
+  const [y, m] = periodo.split('-').map(Number);
+  if (m === 12) return `${y + 1}-01`;
+  return `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
 export default function CobranzaPage() {
   const supabase = createClient();
   const toast = useToast();
@@ -42,6 +49,13 @@ export default function CobranzaPage() {
   const [medio, setMedio] = useState('Efectivo');
   const [cobrando, setCobrando] = useState(false);
   const [recibo, setRecibo] = useState<ReciboGenerado | null>(null);
+
+  // Estado del bloque de pago adelantado
+  const [adelantadoActivo, setAdelantadoActivo] = useState(false);
+  const [cantAdelantadas, setCantAdelantadas] = useState<number>(6);
+  const [desdeAdelantado, setDesdeAdelantado] = useState<string>('');
+  const [importeAdelantadoEditable, setImporteAdelantadoEditable] = useState<string>('');
+  const [importeAdelantadoEditado, setImporteAdelantadoEditado] = useState(false);
 
   useEffect(() => { cargarInicial(); }, []);
 
@@ -62,8 +76,6 @@ export default function CobranzaPage() {
         return;
       }
       sucursalesQuery = sucursalesQuery.in('id', ids);
-
-      // Cobrador SOLO ve sus socios asignados
       sociosQuery = sociosQuery.eq('cobrador_id', yo.id);
     }
 
@@ -88,12 +100,29 @@ export default function CobranzaPage() {
   }
 
   async function cargarDeudas(sId: string) {
-    if (!sId) { setDeudas([]); setSeleccionadas([]); return; }
+    if (!sId) {
+      setDeudas([]);
+      setSeleccionadas([]);
+      setAdelantadoActivo(false);
+      return;
+    }
+
     const { data: ds } = await supabase
-      .from('devengamientos').select('*').eq('socio_id', sId).eq('estado', 'pendiente').order('periodo');
-    const lista = (ds || []) as Devengamiento[];
-    setDeudas(lista);
-    setSeleccionadas(lista.map((d) => d.id));
+      .from('devengamientos').select('*').eq('socio_id', sId).order('periodo');
+    const todos = (ds || []) as Devengamiento[];
+    const pendientes = todos.filter((d) => d.estado === 'pendiente');
+
+    setDeudas(pendientes);
+    setSeleccionadas(pendientes.map((d) => d.id));
+
+    // Calcular el "siguiente mes" después del último devengamiento que ya tenga (sea o no pagado)
+    const ultimoPeriodo = todos.length > 0
+      ? todos.map((d) => d.periodo).sort().reverse()[0]
+      : todayISO().slice(0, 7);
+    setDesdeAdelantado(siguienteMes(ultimoPeriodo));
+
+    setAdelantadoActivo(false);
+    setImporteAdelantadoEditado(false);
 
     if (data) {
       const socio = data.socios.find((s) => s.id === sId);
@@ -108,6 +137,56 @@ export default function CobranzaPage() {
   function toggleAll() {
     if (seleccionadas.length === deudas.length) setSeleccionadas([]);
     else setSeleccionadas(deudas.map((d) => d.id));
+  }
+
+  // ===== PAGO ADELANTADO =====
+  function valorVigenteParaSocio(socio: Socio, periodo: string): number | null {
+    if (!data || !socio.tipo_cuota_id) return null;
+    const valoresOrden = data.valores
+      .filter((v) => v.tipo_id === socio.tipo_cuota_id && v.desde <= periodo)
+      .sort((a, b) => b.desde.localeCompare(a.desde));
+    return valoresOrden[0] ? Number(valoresOrden[0].importe) : null;
+  }
+
+  function periodosAdelantados(): string[] {
+    const lista: string[] = [];
+    let actual = desdeAdelantado;
+    for (let i = 0; i < cantAdelantadas; i++) {
+      lista.push(actual);
+      actual = siguienteMes(actual);
+    }
+    return lista;
+  }
+
+  const socio = data?.socios.find((s) => s.id === socioId) || null;
+
+  // Importe sugerido para el bloque adelantado
+  const periodosAdel = adelantadoActivo && socio ? periodosAdelantados() : [];
+  const importeSugeridoAdel = adelantadoActivo && socio
+    ? periodosAdel.reduce((sum, p) => sum + (valorVigenteParaSocio(socio, p) || 0), 0)
+    : 0;
+
+  const importeAdelFinal = adelantadoActivo
+    ? (importeAdelantadoEditado ? (parseFloat(importeAdelantadoEditable) || 0) : importeSugeridoAdel)
+    : 0;
+
+  const importeDeudas = deudas.filter((d) => seleccionadas.includes(d.id)).reduce((s, d) => s + Number(d.importe), 0);
+  const importeTotal = importeDeudas + importeAdelFinal;
+
+  function activarAdelantado() {
+    if (!socio) return;
+    if (!socio.tipo_cuota_id) {
+      toast.warning('El socio no tiene tipo de cuota asignado, no se puede calcular el adelantado');
+      return;
+    }
+    // Verificar que se pueda calcular el primer período
+    const primerValor = valorVigenteParaSocio(socio, desdeAdelantado);
+    if (primerValor === null) {
+      toast.error(`No hay valor de cuota cargado para ${fmtMesLargo(desdeAdelantado)}. Cargalo en Cuotas.`);
+      return;
+    }
+    setAdelantadoActivo(true);
+    setImporteAdelantadoEditado(false);
   }
 
   async function generarDeudaSiNoTiene() {
@@ -127,11 +206,8 @@ export default function CobranzaPage() {
       return;
     }
 
-    const valoresOrden = data.valores
-      .filter((v) => v.tipo_id === socio.tipo_cuota_id && v.desde <= mes)
-      .sort((a, b) => b.desde.localeCompare(a.desde));
-    const v = valoresOrden[0];
-    if (!v) {
+    const v = valorVigenteParaSocio(socio, mes);
+    if (v === null) {
       const tipoNombre = data.tipos.find(t => t.id === socio.tipo_cuota_id)?.nombre || 'el tipo asignado';
       toast.error(`No hay valor de cuota cargado para ${tipoNombre} en ${mes}`);
       return;
@@ -139,7 +215,7 @@ export default function CobranzaPage() {
 
     const { error } = await supabase.from('devengamientos').insert({
       socio_id: socioId, tipo_id: socio.tipo_cuota_id, periodo: mes,
-      importe: v.importe, estado: 'pendiente', origen: 'cobranza',
+      importe: v, estado: 'pendiente', origen: 'cobranza',
     });
     if (error) { toast.error('Error: ' + error.message); return; }
     toast.success('Cuota del mes generada');
@@ -147,12 +223,64 @@ export default function CobranzaPage() {
   }
 
   async function cobrar() {
-    if (!data || !socioId || !sucursalId || seleccionadas.length === 0) return;
+    if (!data || !socioId || !sucursalId) return;
+    if (seleccionadas.length === 0 && !adelantadoActivo) return;
+    if (!socio) return;
+
     setCobrando(true);
 
     try {
-      const importe = deudas.filter((d) => seleccionadas.includes(d.id)).reduce((s, d) => s + Number(d.importe), 0);
+      let importeFinal = importeDeudas;
+      let devengamientosNuevos: Array<{ id: string; periodo: string; tipo_id: string; importe: number }> = [];
 
+      // 1. Si hay pago adelantado, generamos los devengamientos nuevos primero
+      if (adelantadoActivo && socio.tipo_cuota_id) {
+        // Validar que ningún período del adelantado ya exista
+        const periodos = periodosAdelantados();
+        const { data: existentes } = await supabase
+          .from('devengamientos').select('periodo')
+          .eq('socio_id', socioId).in('periodo', periodos);
+
+        if (existentes && existentes.length > 0) {
+          const conflictos = (existentes || []).map((e: any) => fmtMesLargo(e.periodo)).join(', ');
+          toast.error(`Estos meses ya tienen devengamiento existente: ${conflictos}. Ajustá el "desde" del adelantado.`);
+          setCobrando(false);
+          return;
+        }
+
+        // Crear devengamientos para cada período adelantado
+        const filas = periodos.map((p) => {
+          const valor = valorVigenteParaSocio(socio, p) || 0;
+          return {
+            socio_id: socioId,
+            tipo_id: socio.tipo_cuota_id,
+            periodo: p,
+            importe: valor,
+            estado: 'pendiente',
+            origen: 'pago_adelantado',
+          };
+        });
+
+        const { data: insertados, error } = await supabase
+          .from('devengamientos').insert(filas).select();
+
+        if (error) {
+          toast.error('Error generando devengamientos adelantados: ' + error.message);
+          setCobrando(false);
+          return;
+        }
+
+        devengamientosNuevos = (insertados || []).map((d: any) => ({
+          id: d.id, periodo: d.periodo, tipo_id: d.tipo_id, importe: Number(d.importe),
+        }));
+
+        // El importe del adelantado es lo que el admin/cobrador definió (puede estar editado)
+        // Nota: usamos el importe final, pero los devengamientos quedan con el valor calculado
+        // Si el admin editó (ej: redondeó), la diferencia queda como "no facturada"; el admin debería ajustar valores
+        importeFinal += importeAdelFinal;
+      }
+
+      // 2. Numerar el recibo
       const { data: ultimosNumeros } = await supabase
         .from('pagos').select('numero').eq('sucursal_id', sucursalId)
         .order('numero', { ascending: false }).limit(1);
@@ -170,39 +298,79 @@ export default function CobranzaPage() {
         .from('pagos').select('hash').order('fecha_emision', { ascending: false }).limit(1);
       const prevHash = ultimoPago && ultimoPago.length > 0 ? (ultimoPago[0].hash || '0') : '0';
 
+      // 3. Crear el pago
       const pagoBase = {
         sucursal_id: sucursalId, numero: nuevoNum, socio_id: socioId,
-        fecha_pago: fecha, medio, importe,
+        fecha_pago: fecha, medio, importe: importeFinal,
         cobrador: data.miNombre, cobrador_id: data.miId, prev_hash: prevHash,
       };
       const hash = simpleHash(JSON.stringify(pagoBase));
 
       const { data: pago, error: ePago } = await supabase
         .from('pagos').insert({ ...pagoBase, hash }).select().single();
-      if (ePago) { toast.error('Error: ' + ePago.message); setCobrando(false); return; }
+      if (ePago) {
+        toast.error('Error: ' + ePago.message);
+        setCobrando(false);
+        return;
+      }
 
-      const links = seleccionadas.map((dId) => ({ pago_id: pago.id, devengamiento_id: dId }));
-      await supabase.from('pagos_devengamientos').insert(links);
-      await supabase.from('devengamientos').update({ estado: 'pagado', pago_id: pago.id }).in('id', seleccionadas);
+      // 4. Vincular devengamientos: las deudas seleccionadas + los nuevos adelantados
+      const idsAVincular = [...seleccionadas, ...devengamientosNuevos.map((d) => d.id)];
+      if (idsAVincular.length > 0) {
+        const links = idsAVincular.map((dId) => ({ pago_id: pago.id, devengamiento_id: dId }));
+        await supabase.from('pagos_devengamientos').insert(links);
+        await supabase.from('devengamientos')
+          .update({ estado: 'pagado', pago_id: pago.id })
+          .in('id', idsAVincular);
+      }
 
-      const periodos = deudas.filter((d) => seleccionadas.includes(d.id)).map((d) => d.periodo);
-      const tipoIds = deudas.filter((d) => seleccionadas.includes(d.id)).map((d) => d.tipo_id);
+      // 5. Armar la lista de períodos para el recibo
+      const periodosPagados = [
+        ...deudas.filter((d) => seleccionadas.includes(d.id)).map((d) => d.periodo),
+        ...devengamientosNuevos.map((d) => d.periodo),
+      ].sort();
+
+      const tipoIds = [
+        ...deudas.filter((d) => seleccionadas.includes(d.id)).map((d) => d.tipo_id),
+        ...devengamientosNuevos.map((d) => d.tipo_id),
+      ];
       const tipoNombre = data.tipos.find((t) => tipoIds.includes(t.id))?.nombre;
 
+      // 6. Auditoría
+      const detalleAudit = adelantadoActivo
+        ? `Recibo ${formatNumeroRecibo(sucursal.codigo, nuevoNum)} con adelantado de ${cantAdelantadas} meses por ${fmtMoney(importeFinal)}`
+        : `Recibo ${formatNumeroRecibo(sucursal.codigo, nuevoNum)} por ${fmtMoney(importeFinal)}`;
       await supabase.from('auditoria').insert({
-        usuario: data.miNombre, rol: data.miRol, accion: 'cobro_emitido',
-        detalle: `Recibo ${formatNumeroRecibo(sucursal.codigo, nuevoNum)} por ${fmtMoney(importe)}`,
-        datos: { pago_id: pago.id, importe, sucursal: sucursal.codigo, numero: nuevoNum },
+        usuario: data.miNombre, rol: data.miRol,
+        accion: adelantadoActivo ? 'cobro_con_adelantado' : 'cobro_emitido',
+        detalle: detalleAudit,
+        datos: {
+          pago_id: pago.id, importe: importeFinal,
+          sucursal: sucursal.codigo, numero: nuevoNum,
+          adelantado: adelantadoActivo ? { meses: cantAdelantadas, periodos: periodosAdel } : null,
+        },
         prev_hash: '0', hash: hash,
       });
 
-      const socioActual = data.socios.find((s) => s.id === socioId)!;
-      setRecibo({ pago: pago as Pago, sucursal, socio: socioActual, periodos, tipoCuotaNombre: tipoNombre });
+      // 7. Mostrar el recibo
+      setRecibo({
+        pago: pago as Pago,
+        sucursal,
+        socio,
+        periodos: periodosPagados,
+        tipoCuotaNombre: tipoNombre,
+      });
+
       toast.success(`Recibo ${formatNumeroRecibo(sucursal.codigo, nuevoNum)} emitido`);
-      setSocioId(''); setDeudas([]); setSeleccionadas([]);
+      setSocioId('');
+      setDeudas([]);
+      setSeleccionadas([]);
+      setAdelantadoActivo(false);
     } catch (err: any) {
       toast.error('Error inesperado: ' + (err.message || err));
-    } finally { setCobrando(false); }
+    } finally {
+      setCobrando(false);
+    }
   }
 
   if (!data) return <div className="empty">Cargando...</div>;
@@ -226,9 +394,8 @@ export default function CobranzaPage() {
     );
   }
 
-  const socio = data.socios.find((s) => s.id === socioId);
-  const importeSel = deudas.filter((d) => seleccionadas.includes(d.id)).reduce((s, d) => s + Number(d.importe), 0);
   const todasSeleccionadas = deudas.length > 0 && seleccionadas.length === deudas.length;
+  const puedeAdelantar = !!socio && !!socio.tipo_cuota_id;
 
   return (
     <div>
@@ -257,12 +424,17 @@ export default function CobranzaPage() {
           />
         </div>
 
-        {socio && deudas.length === 0 && (
+        {socio && deudas.length === 0 && !adelantadoActivo && (
           <div className="banner warning" style={{ marginTop: 12 }}>
             <strong>{socio.nombre}</strong> no tiene cuotas pendientes registradas.
-            {socio.tipo_cuota_id && (
-              <> <button onClick={generarDeudaSiNoTiene} style={{ marginLeft: 8 }}>Generar cuota del mes actual</button></>
-            )}
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {socio.tipo_cuota_id && (
+                <button onClick={generarDeudaSiNoTiene}>Generar cuota del mes actual</button>
+              )}
+              {puedeAdelantar && (
+                <button onClick={activarAdelantado}>Cobrar cuotas adelantadas</button>
+              )}
+            </div>
           </div>
         )}
 
@@ -288,8 +460,97 @@ export default function CobranzaPage() {
                 );
               })}
             </div>
+          </>
+        )}
 
-            <div className="banner info">Total a cobrar: <strong>{fmtMoney(importeSel)}</strong></div>
+        {/* === BLOQUE PAGO ADELANTADO === */}
+        {socio && puedeAdelantar && !adelantadoActivo && deudas.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <button onClick={activarAdelantado}>+ Sumar cuotas adelantadas a este pago</button>
+          </div>
+        )}
+
+        {socio && adelantadoActivo && (
+          <div style={{ background: 'var(--primary-bg)', padding: 12, borderRadius: 'var(--radius)', marginBottom: 12, border: '1px solid var(--primary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h3 style={{ marginBottom: 0, color: 'var(--primary)' }}>Cuotas adelantadas</h3>
+              <button onClick={() => setAdelantadoActivo(false)} style={{ fontSize: 12 }}>Quitar</button>
+            </div>
+            <div className="row">
+              <div className="field">
+                <label>Cantidad de meses</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={cantAdelantadas}
+                  onChange={(e) => {
+                    setCantAdelantadas(Math.max(1, Math.min(24, parseInt(e.target.value) || 1)));
+                    setImporteAdelantadoEditado(false);
+                  }}
+                />
+              </div>
+              <div className="field">
+                <label>Desde el mes</label>
+                <input
+                  type="month"
+                  value={desdeAdelantado}
+                  onChange={(e) => {
+                    setDesdeAdelantado(e.target.value);
+                    setImporteAdelantadoEditado(false);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--surface)', padding: 8, borderRadius: 'var(--radius)', marginBottom: 8, fontSize: 13 }}>
+              <strong>Meses a anticipar:</strong> {periodosAdel.map(fmtMesLargo).join(', ')}
+            </div>
+
+            <div className="field">
+              <label>Importe total adelantado (sugerido: {fmtMoney(importeSugeridoAdel)})</label>
+              <input
+                type="number"
+                step="0.01"
+                value={importeAdelantadoEditado ? importeAdelantadoEditable : importeSugeridoAdel}
+                onChange={(e) => {
+                  setImporteAdelantadoEditable(e.target.value);
+                  setImporteAdelantadoEditado(true);
+                }}
+              />
+              {importeAdelantadoEditado && (
+                <small style={{ color: 'var(--text-3)' }}>
+                  Editado manualmente. Sugerido: {fmtMoney(importeSugeridoAdel)}
+                  <button
+                    type="button"
+                    onClick={() => setImporteAdelantadoEditado(false)}
+                    style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px' }}
+                  >
+                    Volver al sugerido
+                  </button>
+                </small>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* === RESUMEN Y BOTÓN COBRAR === */}
+        {socio && (deudas.length > 0 || adelantadoActivo) && (
+          <>
+            <div className="banner info">
+              {seleccionadas.length > 0 && (
+                <>Cuotas pendientes: <strong>{fmtMoney(importeDeudas)}</strong></>
+              )}
+              {seleccionadas.length > 0 && adelantadoActivo && <br />}
+              {adelantadoActivo && (
+                <>Adelantado ({cantAdelantadas} meses): <strong>{fmtMoney(importeAdelFinal)}</strong></>
+              )}
+              {(seleccionadas.length > 0 && adelantadoActivo) && (
+                <div style={{ marginTop: 4, fontSize: 16 }}>
+                  Total a cobrar: <strong>{fmtMoney(importeTotal)}</strong>
+                </div>
+              )}
+            </div>
 
             <div className="row">
               <div className="field">
@@ -304,7 +565,11 @@ export default function CobranzaPage() {
               </div>
               <div className="field" style={{ flex: '0 0 auto' }}>
                 <label>&nbsp;</label>
-                <button className="primary" onClick={cobrar} disabled={cobrando || seleccionadas.length === 0}>
+                <button
+                  className="primary"
+                  onClick={cobrar}
+                  disabled={cobrando || (seleccionadas.length === 0 && !adelantadoActivo)}
+                >
                   {cobrando ? 'Procesando...' : 'Cobrar y emitir recibo'}
                 </button>
               </div>
