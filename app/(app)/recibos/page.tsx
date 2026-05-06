@@ -3,13 +3,17 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fmtMoney, fmtDate, formatNumeroRecibo, fmtMesLargo } from '@/lib/utils';
-import type { Pago, Sucursal, Socio } from '@/lib/types';
+import { descargarReciboPDF } from '@/lib/recibo-pdf';
+import ReciboVisual from '@/components/ReciboVisual';
+import type { Pago, Sucursal, Socio, Club, TipoCuota } from '@/lib/types';
 
 export default function RecibosPage() {
   const supabase = createClient();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [socios, setSocios] = useState<Socio[]>([]);
+  const [tipos, setTipos] = useState<TipoCuota[]>([]);
+  const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtroSucursal, setFiltroSucursal] = useState('');
   const [verAnulados, setVerAnulados] = useState(false);
@@ -28,14 +32,18 @@ export default function RecibosPage() {
     let pagosQuery = supabase.from('pagos').select('*').order('fecha_emision', { ascending: false }).limit(200);
     if (yo.rol === 'cobrador') pagosQuery = pagosQuery.eq('cobrador_id', yo.id);
 
-    const [p, s, so] = await Promise.all([
+    const [p, s, so, t, c] = await Promise.all([
       pagosQuery,
       supabase.from('sucursales').select('*'),
-      supabase.from('socios').select('id, nombre, numero, telefono'),
+      supabase.from('socios').select('id, nombre, numero, telefono, dni'),
+      supabase.from('tipos_cuota').select('*'),
+      supabase.from('clubes').select('*').limit(1).maybeSingle(),
     ]);
     setPagos((p.data || []) as Pago[]);
     setSucursales((s.data || []) as Sucursal[]);
     setSocios((so.data || []) as Socio[]);
+    setTipos((t.data || []) as TipoCuota[]);
+    setClub(c.data as Club | null);
     setLoading(false);
   }
 
@@ -140,11 +148,13 @@ export default function RecibosPage() {
         )}
       </div>
 
-      {detalle && (
+      {detalle && club && (
         <DetalleRecibo
           pago={detalle}
           sucursales={sucursales}
           socios={socios}
+          tipos={tipos}
+          club={club}
           puedeAnular={miRol === 'admin' && !detalle.anulado}
           onAnular={anular}
           onClose={() => setDetalle(null)}
@@ -154,16 +164,19 @@ export default function RecibosPage() {
   );
 }
 
-function DetalleRecibo({ pago, sucursales, socios, puedeAnular, onAnular, onClose }: {
+function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onAnular, onClose }: {
   pago: Pago;
   sucursales: Sucursal[];
   socios: Socio[];
+  tipos: TipoCuota[];
+  club: Club;
   puedeAnular: boolean;
   onAnular: (pago: Pago, motivo: string) => void;
   onClose: () => void;
 }) {
   const supabase = createClient();
   const [periodos, setPeriodos] = useState<string[]>([]);
+  const [tipoCuotaNombre, setTipoCuotaNombre] = useState<string | undefined>();
   const [loadingDet, setLoadingDet] = useState(true);
 
   useEffect(() => {
@@ -171,8 +184,12 @@ function DetalleRecibo({ pago, sucursales, socios, puedeAnular, onAnular, onClos
       const { data: links } = await supabase.from('pagos_devengamientos').select('devengamiento_id').eq('pago_id', pago.id);
       const ids = (links || []).map((l: any) => l.devengamiento_id);
       if (ids.length === 0) { setPeriodos([]); setLoadingDet(false); return; }
-      const { data: ds } = await supabase.from('devengamientos').select('periodo').in('id', ids);
-      setPeriodos((ds || []).map((d: any) => d.periodo).sort());
+      const { data: ds } = await supabase.from('devengamientos').select('periodo, tipo_id').in('id', ids);
+      const periodosOrd = (ds || []).map((d: any) => d.periodo).sort();
+      setPeriodos(periodosOrd);
+      const tipoIdsUnicos = Array.from(new Set((ds || []).map((d: any) => d.tipo_id)));
+      const tipoNombre = tipos.find((t) => tipoIdsUnicos.includes(t.id))?.nombre;
+      setTipoCuotaNombre(tipoNombre);
       setLoadingDet(false);
     }
     load();
@@ -182,10 +199,30 @@ function DetalleRecibo({ pago, sucursales, socios, puedeAnular, onAnular, onClos
   const socio = socios.find((s) => s.id === pago.socio_id);
   const num = suc ? formatNumeroRecibo(suc.codigo, pago.numero) : '?';
 
+  if (!suc || !socio) return null;
+
+  function descargarPDF() {
+    if (!suc || !socio) return;
+    descargarReciboPDF({
+      pago, sucursal: suc, socio, club, periodos, tipoCuotaNombre,
+    });
+  }
+
   function enviarWhatsapp() {
+    if (!socio) return;
     const periodosFmt = periodos.map(fmtMesLargo).join(', ');
-    const texto = `*Recibo*\n\nNúmero: ${num}\nFecha: ${fmtDate(pago.fecha_pago)}\nPeríodo(s): ${periodosFmt}\nImporte: ${fmtMoney(pago.importe)}\nMedio: ${pago.medio}`;
-    const tel = (socio?.telefono || '').replace(/[^0-9]/g, '');
+    const texto =
+      `*${club.nombre}*\n` +
+      `*RECIBO N° ${num}*\n\n` +
+      `Fecha: ${fmtDate(pago.fecha_pago)}\n` +
+      `Socio: ${socio.nombre}\n` +
+      `Socio N°: ${socio.numero}\n` +
+      (tipoCuotaNombre ? `Concepto: ${tipoCuotaNombre}\n` : '') +
+      (periodosFmt ? `Período: ${periodosFmt}\n` : '') +
+      `Medio de pago: ${pago.medio}\n` +
+      `*TOTAL: ${fmtMoney(pago.importe)}*\n\n` +
+      `_Documento no válido como factura_`;
+    const tel = (socio.telefono || '').replace(/[^0-9]/g, '');
     const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`;
     window.open(url, '_blank');
   }
@@ -194,21 +231,9 @@ function DetalleRecibo({ pago, sucursales, socios, puedeAnular, onAnular, onClos
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {pago.anulado && <div className="banner danger">Recibo anulado por {pago.anulado_por}{pago.motivo_anulacion ? ` - ${pago.motivo_anulacion}` : ''}</div>}
-        <div className="recibo">
-          <div className="recibo-header">
-            <div style={{ fontWeight: 500 }}>RECIBO</div>
-            <div className="recibo-num" style={{ fontSize: 18, fontWeight: 500, marginTop: 4 }}>{num}</div>
-          </div>
-          <div className="recibo-row"><span className="lbl">Fecha</span><span className="val">{fmtDate(pago.fecha_pago)}</span></div>
-          <div className="recibo-row"><span className="lbl">Socio</span><span className="val">{socio?.nombre || '-'}</span></div>
-          {socio?.numero != null && <div className="recibo-row"><span className="lbl">Socio N°</span><span className="val">{socio.numero}</span></div>}
-          <div className="recibo-row"><span className="lbl">Cobrador</span><span className="val">{pago.cobrador || '-'}</span></div>
-          <div className="recibo-row"><span className="lbl">Medio</span><span className="val">{pago.medio}</span></div>
-          {!loadingDet && periodos.length > 0 && (
-            <div className="recibo-row"><span className="lbl">Período(s)</span><span className="val">{periodos.map((p) => fmtMesLargo(p)).join(', ')}</span></div>
-          )}
-          <div className="recibo-total"><span>Total</span><span>{fmtMoney(pago.importe)}</span></div>
-        </div>
+        {!loadingDet && (
+          <ReciboVisual pago={pago} sucursal={suc} socio={socio} club={club} periodos={periodos} tipoCuotaNombre={tipoCuotaNombre} />
+        )}
         <div className="actions" style={{ justifyContent: 'space-between', marginTop: 16 }}>
           {puedeAnular && (
             <button className="danger" onClick={() => {
@@ -216,8 +241,9 @@ function DetalleRecibo({ pago, sucursales, socios, puedeAnular, onAnular, onClos
               if (motivo) onAnular(pago, motivo);
             }}>Anular recibo</button>
           )}
-          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-            {!pago.anulado && <button onClick={enviarWhatsapp}>Enviar por WhatsApp</button>}
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <button onClick={descargarPDF}>📄 PDF</button>
+            {!pago.anulado && <button onClick={enviarWhatsapp}>WhatsApp</button>}
             <button className="primary" onClick={onClose}>Cerrar</button>
           </div>
         </div>

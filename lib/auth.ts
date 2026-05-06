@@ -13,9 +13,6 @@ export async function getUsuarioActual(): Promise<Usuario> {
     .eq('auth_id', user.id)
     .maybeSingle();
 
-  if (!usuario) {
-    redirect('/login');
-  }
-
+  if (!usuario) redirect('/login');
   return usuario as Usuario;
 }

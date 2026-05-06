@@ -9,9 +9,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
@@ -24,7 +22,6 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-
   const path = request.nextUrl.pathname;
   const esRutaPublica = path === '/login' || path.startsWith('/_next') || path.startsWith('/api/auth');
 
@@ -33,7 +30,6 @@ export async function updateSession(request: NextRequest) {
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
-
   if (user && path === '/login') {
     const url = request.nextUrl.clone();
     url.pathname = '/';

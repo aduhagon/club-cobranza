@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fmtMoney, fmtMesLargo, todayISO, formatNumeroRecibo, simpleHash } from '@/lib/utils';
-import type { Socio, Sucursal, TipoCuota, Devengamiento, ValorCuota } from '@/lib/types';
+import { descargarReciboPDF } from '@/lib/recibo-pdf';
+import ReciboVisual from '@/components/ReciboVisual';
+import type { Socio, Sucursal, TipoCuota, Devengamiento, ValorCuota, Pago, Club } from '@/lib/types';
 
 const MEDIOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Débito automático', 'Tarjeta de débito', 'Tarjeta de crédito', 'Cheque'];
 
@@ -12,17 +14,18 @@ interface CobranzaData {
   sucursales: Sucursal[];
   tipos: TipoCuota[];
   valores: ValorCuota[];
+  club: Club | null;
   miNombre: string;
   miId: string;
   miRol: string;
 }
 
 interface ReciboGenerado {
-  numero: number;
-  codigo: string;
-  importe: number;
+  pago: Pago;
+  sucursal: Sucursal;
+  socio: Socio;
   periodos: string[];
-  telefonoSocio: string;
+  tipoCuotaNombre?: string;
 }
 
 export default function CobranzaPage() {
@@ -50,17 +53,18 @@ export default function CobranzaPage() {
       const { data: asig } = await supabase.from('cobradores_sucursales').select('sucursal_id').eq('cobrador_id', yo.id);
       const ids = (asig || []).map((a: any) => a.sucursal_id);
       if (ids.length === 0) {
-        setData({ socios: [], sucursales: [], tipos: [], valores: [], miNombre: yo.nombre, miId: yo.id, miRol: yo.rol });
+        setData({ socios: [], sucursales: [], tipos: [], valores: [], club: null, miNombre: yo.nombre, miId: yo.id, miRol: yo.rol });
         return;
       }
       sucursalesQuery = sucursalesQuery.in('id', ids);
     }
 
-    const [s, sucRes, t, v] = await Promise.all([
+    const [s, sucRes, t, v, c] = await Promise.all([
       supabase.from('socios').select('*').is('fecha_baja', null).order('numero'),
       sucursalesQuery,
       supabase.from('tipos_cuota').select('*'),
       supabase.from('valores_cuota').select('*'),
+      supabase.from('clubes').select('*').limit(1).maybeSingle(),
     ]);
 
     setData({
@@ -68,6 +72,7 @@ export default function CobranzaPage() {
       sucursales: (sucRes.data || []) as Sucursal[],
       tipos: (t.data || []) as TipoCuota[],
       valores: (v.data || []) as ValorCuota[],
+      club: (c.data || null) as Club | null,
       miNombre: yo.nombre, miId: yo.id, miRol: yo.rol,
     });
 
@@ -162,6 +167,8 @@ export default function CobranzaPage() {
       await supabase.from('devengamientos').update({ estado: 'pagado', pago_id: pago.id }).in('id', seleccionadas);
 
       const periodos = deudas.filter((d) => seleccionadas.includes(d.id)).map((d) => d.periodo);
+      const tipoIds = deudas.filter((d) => seleccionadas.includes(d.id)).map((d) => d.tipo_id);
+      const tipoNombre = data.tipos.find((t) => tipoIds.includes(t.id))?.nombre;
 
       await supabase.from('auditoria').insert({
         usuario: data.miNombre, rol: data.miRol, accion: 'cobro_emitido',
@@ -170,10 +177,9 @@ export default function CobranzaPage() {
         prev_hash: '0', hash: hash,
       });
 
-      const socioActual = data.socios.find((s) => s.id === socioId);
+      const socioActual = data.socios.find((s) => s.id === socioId)!;
       setRecibo({
-        numero: nuevoNum, codigo: sucursal.codigo, importe, periodos,
-        telefonoSocio: socioActual?.telefono || '',
+        pago: pago as Pago, sucursal, socio: socioActual, periodos, tipoCuotaNombre: tipoNombre,
       });
       setSocioId(''); setDeudas([]); setSeleccionadas([]);
     } catch (err: any) {
@@ -198,7 +204,9 @@ export default function CobranzaPage() {
     <div>
       <div className="main-header"><h1>Cobrar</h1></div>
 
-      {recibo && <ReciboModal recibo={recibo} onClose={() => setRecibo(null)} />}
+      {recibo && data.club && (
+        <ReciboGeneradoModal recibo={recibo} club={data.club} onClose={() => setRecibo(null)} />
+      )}
 
       <div className="card">
         <div className="row">
@@ -274,13 +282,28 @@ export default function CobranzaPage() {
   );
 }
 
-function ReciboModal({ recibo, onClose }: { recibo: ReciboGenerado; onClose: () => void }) {
-  const numeroFmt = formatNumeroRecibo(recibo.codigo, recibo.numero);
+function ReciboGeneradoModal({ recibo, club, onClose }: { recibo: ReciboGenerado; club: Club; onClose: () => void }) {
+  function descargarPDF() {
+    descargarReciboPDF({
+      pago: recibo.pago, sucursal: recibo.sucursal, socio: recibo.socio, club,
+      periodos: recibo.periodos, tipoCuotaNombre: recibo.tipoCuotaNombre,
+    });
+  }
 
   function enviarWhatsapp() {
-    const periodosFmt = recibo.periodos.map((p) => fmtMesLargo(p)).join(', ');
-    const texto = `*Recibo emitido*\n\nNúmero: ${numeroFmt}\nPeríodo(s): ${periodosFmt}\nImporte: ${fmtMoney(recibo.importe)}\n\n¡Gracias!`;
-    const tel = recibo.telefonoSocio.replace(/[^0-9]/g, '');
+    const numRecibo = formatNumeroRecibo(recibo.sucursal.codigo, recibo.pago.numero);
+    const periodosFmt = recibo.periodos.map(fmtMesLargo).join(', ');
+    const texto =
+      `*${club.nombre}*\n` +
+      `*RECIBO N° ${numRecibo}*\n\n` +
+      `Socio: ${recibo.socio.nombre}\n` +
+      `Socio N°: ${recibo.socio.numero}\n` +
+      (recibo.tipoCuotaNombre ? `Concepto: ${recibo.tipoCuotaNombre}\n` : '') +
+      (periodosFmt ? `Período: ${periodosFmt}\n` : '') +
+      `Medio de pago: ${recibo.pago.medio}\n` +
+      `*TOTAL: ${fmtMoney(recibo.pago.importe)}*\n\n` +
+      `_Documento no válido como factura_`;
+    const tel = (recibo.socio.telefono || '').replace(/[^0-9]/g, '');
     const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`;
     window.open(url, '_blank');
   }
@@ -289,14 +312,17 @@ function ReciboModal({ recibo, onClose }: { recibo: ReciboGenerado; onClose: () 
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="banner success">Recibo emitido correctamente</div>
-        <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Número de recibo</div>
-          <div className="recibo-num" style={{ fontSize: 24, fontWeight: 500 }}>{numeroFmt}</div>
-          <div style={{ fontSize: 28, fontWeight: 500, marginTop: 12 }}>{fmtMoney(recibo.importe)}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>{recibo.periodos.length} cuota(s) pagada(s)</div>
-        </div>
-        <div className="actions" style={{ justifyContent: 'center' }}>
-          <button onClick={enviarWhatsapp}>Enviar por WhatsApp</button>
+        <ReciboVisual
+          pago={recibo.pago}
+          sucursal={recibo.sucursal}
+          socio={recibo.socio}
+          club={club}
+          periodos={recibo.periodos}
+          tipoCuotaNombre={recibo.tipoCuotaNombre}
+        />
+        <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>
+          <button onClick={descargarPDF}>📄 Descargar PDF</button>
+          <button onClick={enviarWhatsapp}>WhatsApp</button>
           <button className="primary" onClick={onClose}>Listo</button>
         </div>
       </div>

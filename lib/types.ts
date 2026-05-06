@@ -9,6 +9,14 @@ export interface Usuario {
   activo: boolean;
 }
 
+export interface Club {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+  cuit: string | null;
+  contacto: string | null;
+}
+
 export interface Sucursal {
   id: string;
   codigo: string;
@@ -78,4 +86,21 @@ export interface Pago {
   comentario_anulacion: string | null;
   prev_hash: string | null;
   hash: string | null;
+}
+
+export interface Rendicion {
+  id: string;
+  cobrador: string;
+  cobrador_id: string;
+  semana_inicio: string;
+  semana_fin: string;
+  fecha_cierre: string;
+  estado: 'cerrada' | 'aprobada' | 'rechazada';
+  total_cerrado: number;
+  aprobada_por: string | null;
+  fecha_aprobacion: string | null;
+  rechazada_por: string | null;
+  fecha_rechazo: string | null;
+  motivo_rechazo: string | null;
+  creado_en: string;
 }

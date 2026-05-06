@@ -5,13 +5,14 @@ export default async function DashboardPage() {
   const supabase = createClient();
   const mes = thisMonth();
 
-  const [{ count: sociosActivos }, { data: pagosMes }, { data: socios }, { data: sucursales }, { data: recientes }] =
+  const [{ count: sociosActivos }, { data: pagosMes }, { data: socios }, { data: sucursales }, { data: recientes }, { count: deudas }] =
     await Promise.all([
       supabase.from('socios').select('*', { count: 'exact', head: true }).is('fecha_baja', null),
       supabase.from('pagos').select('*').eq('anulado', false).gte('fecha_pago', mes + '-01'),
       supabase.from('socios').select('id, nombre'),
       supabase.from('sucursales').select('id, codigo'),
       supabase.from('pagos').select('*').order('fecha_emision', { ascending: false }).limit(8),
+      supabase.from('devengamientos').select('*', { count: 'exact', head: true }).eq('estado', 'pendiente'),
     ]);
 
   const totalMes = (pagosMes || []).reduce((s, p) => s + Number(p.importe), 0);
@@ -36,6 +37,10 @@ export default async function DashboardPage() {
           <div className="stat-label">Cobros del mes</div>
           <div className="stat-value">{cantidadCobros}</div>
         </div>
+        <div className="stat">
+          <div className="stat-label">Cuotas pendientes</div>
+          <div className="stat-value danger">{deudas || 0}</div>
+        </div>
       </div>
 
       <div className="card">
@@ -45,13 +50,7 @@ export default async function DashboardPage() {
         ) : (
           <table>
             <thead>
-              <tr>
-                <th>Recibo</th>
-                <th>Fecha</th>
-                <th>Socio</th>
-                <th>Cobrador</th>
-                <th>Importe</th>
-              </tr>
+              <tr><th>Recibo</th><th>Fecha</th><th>Socio</th><th>Cobrador</th><th>Importe</th></tr>
             </thead>
             <tbody>
               {recientes.map((p) => {

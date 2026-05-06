@@ -25,6 +25,7 @@ export default function Sidebar({ nombre, rol }: Props) {
     { href: '/', label: 'Inicio' },
     { href: '/cobranza', label: 'Cobrar' },
     { href: '/recibos', label: 'Recibos' },
+    { href: '/rendiciones', label: 'Rendiciones' },
     { href: '/socios', label: 'Socios' },
     { href: '/cuotas', label: 'Cuotas' },
     { href: '/talonarios', label: 'Talonarios' },
@@ -32,6 +33,7 @@ export default function Sidebar({ nombre, rol }: Props) {
   const navCobrador = [
     { href: '/cobranza', label: 'Cobrar' },
     { href: '/recibos', label: 'Mis recibos' },
+    { href: '/rendiciones', label: 'Mis rendiciones' },
   ];
   const navConsulta = [
     { href: '/', label: 'Inicio' },
