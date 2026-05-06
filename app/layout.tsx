@@ -1,8 +1,9 @@
-import "./globals.css";
+import './globals.css';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: "Cobranza del Club",
-  description: "Sistema de cobranza de cuotas sociales"
+export const metadata: Metadata = {
+  title: 'Cobranza Club',
+  description: 'Sistema de cobro de cuotas',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
