@@ -52,6 +52,8 @@ export default function CobranzaPage() {
     if (!yo) return;
 
     let sucursalesQuery = supabase.from('sucursales').select('*').eq('activa', true).order('codigo');
+    let sociosQuery = supabase.from('socios').select('*').is('fecha_baja', null).order('numero');
+
     if (yo.rol === 'cobrador') {
       const { data: asig } = await supabase.from('cobradores_sucursales').select('sucursal_id').eq('cobrador_id', yo.id);
       const ids = (asig || []).map((a: any) => a.sucursal_id);
@@ -60,10 +62,13 @@ export default function CobranzaPage() {
         return;
       }
       sucursalesQuery = sucursalesQuery.in('id', ids);
+
+      // Cobrador SOLO ve sus socios asignados
+      sociosQuery = sociosQuery.eq('cobrador_id', yo.id);
     }
 
     const [s, sucRes, t, v, c] = await Promise.all([
-      supabase.from('socios').select('*').is('fecha_baja', null).order('numero'),
+      sociosQuery,
       sucursalesQuery,
       supabase.from('tipos_cuota').select('*'),
       supabase.from('valores_cuota').select('*'),
@@ -206,6 +211,17 @@ export default function CobranzaPage() {
       <div>
         <h1>Cobrar</h1>
         <div className="banner warning">No hay sucursales activas. Agregá una en Talonarios.</div>
+      </div>
+    );
+  }
+
+  if (data.miRol === 'cobrador' && data.socios.length === 0) {
+    return (
+      <div>
+        <h1>Cobrar</h1>
+        <div className="banner warning">
+          No tenés socios asignados todavía. Pedile al administrador que te asigne socios desde la pantalla de Socios.
+        </div>
       </div>
     );
   }

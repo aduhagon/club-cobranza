@@ -1,10 +1,13 @@
-# Cobranza Club v6
+# Cobranza Club v7
 
-Sistema de cobro de cuotas con procesos masivos:
-- Devengamiento masivo de cuotas mensuales
-- Cobro masivo de Débitos Automáticos con confirmación
+Asignación de cobrador a socios:
+- Cada socio puede tener un cobrador asignado (o quedar "libre")
+- El cobrador solo ve y puede cobrar a sus socios asignados
+- Los socios libres solo pueden ser cobrados por el administrador
+- Asignación masiva con tildes desde el listado de socios
+- Filtro por cobrador en el listado
 
-Más todo lo del v5: identidad del club (logo y color), búsqueda de socios, mobile responsive, etc.
+Más todo lo del v6: procesos masivos (devengamiento + DA), identidad del club, etc.
 
 ## Variables de entorno
 - NEXT_PUBLIC_SUPABASE_URL

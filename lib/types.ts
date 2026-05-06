@@ -50,6 +50,7 @@ export interface Socio {
   telefono: string | null;
   email: string | null;
   tipo_cuota_id: string | null;
+  cobrador_id: string | null;
   fecha_alta: string;
   fecha_baja: string | null;
   motivo_baja: string | null;
