@@ -30,6 +30,7 @@ export default function AppShell({ nombre, rol, club }: Props) {
     { href: '/recibos', label: 'Recibos' },
     { href: '/rendiciones', label: 'Rendiciones' },
     { href: '/procesos', label: 'Procesos masivos' },
+    { href: '/importar', label: 'Importar socios' },
     { href: '/socios', label: 'Socios' },
     { href: '/cuotas', label: 'Cuotas' },
     { href: '/talonarios', label: 'Talonarios' },

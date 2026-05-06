@@ -1,14 +1,12 @@
-# Cobranza Club v8
+# Cobranza Club v9
 
-Pagos adelantados:
-- En la pantalla "Cobrar" se puede sumar un bloque de cuotas adelantadas
-- Se eligen cantidad de meses y desde qué mes empezar
-- El sistema sugiere automáticamente el monto (cantidad × valor vigente)
-- Se puede editar el monto si el socio paga un valor distinto
-- Al cobrar, se generan los devengamientos futuros y se marcan como pagados
-- El recibo lista todos los meses anticipados
+Importación masiva de socios desde Excel:
+- Plantilla Excel descargable con instrucciones
+- Validación previa con detalle de errores fila por fila
+- Importación con saltar errores y seguir
+- Reporte final con cantidad de OK y errores
 
-Más todo lo del v7: asignación cobrador-socio, procesos masivos, identidad del club.
+Más todo lo del v8: pagos adelantados, asignación cobrador-socio, procesos masivos, identidad del club.
 
 ## Variables de entorno
 - NEXT_PUBLIC_SUPABASE_URL
