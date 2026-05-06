@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/Toast';
 import type { Sucursal, Usuario } from '@/lib/types';
 
 export default function TalonariosPage() {
   const supabase = createClient();
+  const toast = useToast();
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [cobradores, setCobradores] = useState<Usuario[]>([]);
   const [asignaciones, setAsignaciones] = useState<{ cobrador_id: string; sucursal_id: string }[]>([]);
@@ -28,10 +30,12 @@ export default function TalonariosPage() {
   async function saveSucursal(s: Partial<Sucursal>) {
     if (editingSuc === 'new') {
       const { error } = await supabase.from('sucursales').insert(s as any);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
+      toast.success('Sucursal creada');
     } else if (editingSuc) {
       const { error } = await supabase.from('sucursales').update(s).eq('id', editingSuc.id);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
+      toast.success('Sucursal actualizada');
     }
     setEditingSuc(null);
     cargar();
@@ -40,7 +44,8 @@ export default function TalonariosPage() {
   async function delSucursal(id: string) {
     if (!confirm('¿Eliminar sucursal? Solo si nunca emitió recibos.')) return;
     const { error } = await supabase.from('sucursales').delete().eq('id', id);
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success('Sucursal eliminada');
     cargar();
   }
 
@@ -48,19 +53,21 @@ export default function TalonariosPage() {
     let cobradorId: string;
     if (editingCob === 'new') {
       const { data, error } = await supabase.from('usuarios').insert({ ...c, rol: 'cobrador' }).select().single();
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
       cobradorId = data.id;
+      toast.success('Cobrador creado');
     } else if (editingCob) {
       const { error } = await supabase.from('usuarios').update(c).eq('id', editingCob.id);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
       cobradorId = editingCob.id;
       await supabase.from('cobradores_sucursales').delete().eq('cobrador_id', cobradorId);
+      toast.success('Cobrador actualizado');
     } else return;
 
     if (sucursalIds.length > 0) {
       const rows = sucursalIds.map((sid) => ({ cobrador_id: cobradorId, sucursal_id: sid }));
       const { error } = await supabase.from('cobradores_sucursales').insert(rows);
-      if (error) { alert('Error asignando sucursales: ' + error.message); return; }
+      if (error) { toast.error('Error asignando sucursales: ' + error.message); return; }
     }
     setEditingCob(null);
     cargar();
@@ -84,7 +91,7 @@ export default function TalonariosPage() {
 
       <div className="banner info">
         Cada sucursal tiene su propia numeración correlativa de recibos. Asigná las sucursales correspondientes a cada cobrador.
-        Cuando creés un cobrador acá, también tenés que crearle un usuario en Supabase Authentication con el mismo email para que pueda iniciar sesión.
+        Cuando creés un cobrador acá, también tenés que crearle un usuario en Supabase Authentication con el mismo email.
       </div>
 
       <div className="card">

@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { fmtMoney, fmtMesLargo, todayISO, formatNumeroRecibo, simpleHash } from '@/lib/utils';
 import { descargarReciboPDF } from '@/lib/recibo-pdf';
 import ReciboVisual from '@/components/ReciboVisual';
+import SocioSearchInput from '@/components/SocioSearchInput';
+import { useToast } from '@/components/Toast';
 import type { Socio, Sucursal, TipoCuota, Devengamiento, ValorCuota, Pago, Club } from '@/lib/types';
 
 const MEDIOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Débito automático', 'Tarjeta de débito', 'Tarjeta de crédito', 'Cheque'];
@@ -30,6 +32,7 @@ interface ReciboGenerado {
 
 export default function CobranzaPage() {
   const supabase = createClient();
+  const toast = useToast();
   const [data, setData] = useState<CobranzaData | null>(null);
   const [socioId, setSocioId] = useState('');
   const [sucursalId, setSucursalId] = useState('');
@@ -97,17 +100,28 @@ export default function CobranzaPage() {
     setSeleccionadas((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }
 
+  function toggleAll() {
+    if (seleccionadas.length === deudas.length) {
+      setSeleccionadas([]);
+    } else {
+      setSeleccionadas(deudas.map((d) => d.id));
+    }
+  }
+
   async function generarDeudaSiNoTiene() {
     if (!data || !socioId) return;
     const socio = data.socios.find((s) => s.id === socioId);
-    if (!socio || !socio.tipo_cuota_id) { alert('El socio no tiene tipo de cuota asignado'); return; }
+    if (!socio || !socio.tipo_cuota_id) {
+      toast.warning('El socio no tiene tipo de cuota asignado');
+      return;
+    }
     const mes = new Date().toISOString().slice(0, 7);
 
     const { data: existing } = await supabase
       .from('devengamientos').select('id')
       .eq('socio_id', socioId).eq('tipo_id', socio.tipo_cuota_id).eq('periodo', mes);
     if (existing && existing.length > 0) {
-      alert('Ya existe un devengamiento para este mes. Recargá la página.');
+      toast.info('Ya existe un devengamiento para este mes. Recargá la página.');
       return;
     }
 
@@ -117,7 +131,7 @@ export default function CobranzaPage() {
     const v = valoresOrden[0];
     if (!v) {
       const tipoNombre = data.tipos.find(t => t.id === socio.tipo_cuota_id)?.nombre || 'el tipo asignado';
-      alert(`No hay valor de cuota cargado para ${tipoNombre} en ${mes}. Cargalo en la solapa Cuotas.`);
+      toast.error(`No hay valor de cuota cargado para ${tipoNombre} en ${mes}`);
       return;
     }
 
@@ -125,7 +139,8 @@ export default function CobranzaPage() {
       socio_id: socioId, tipo_id: socio.tipo_cuota_id, periodo: mes,
       importe: v.importe, estado: 'pendiente', origen: 'cobranza',
     });
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success('Cuota del mes generada');
     cargarDeudas(socioId);
   }
 
@@ -144,7 +159,9 @@ export default function CobranzaPage() {
       const nuevoNum = ultimoNum + 1;
 
       if (sucursal.numero_hasta && nuevoNum > sucursal.numero_hasta) {
-        alert('El talonario de esta sucursal está agotado'); setCobrando(false); return;
+        toast.error('El talonario de esta sucursal está agotado');
+        setCobrando(false);
+        return;
       }
 
       const { data: ultimoPago } = await supabase
@@ -160,7 +177,7 @@ export default function CobranzaPage() {
 
       const { data: pago, error: ePago } = await supabase
         .from('pagos').insert({ ...pagoBase, hash }).select().single();
-      if (ePago) { alert('Error: ' + ePago.message); setCobrando(false); return; }
+      if (ePago) { toast.error('Error: ' + ePago.message); setCobrando(false); return; }
 
       const links = seleccionadas.map((dId) => ({ pago_id: pago.id, devengamiento_id: dId }));
       await supabase.from('pagos_devengamientos').insert(links);
@@ -178,12 +195,11 @@ export default function CobranzaPage() {
       });
 
       const socioActual = data.socios.find((s) => s.id === socioId)!;
-      setRecibo({
-        pago: pago as Pago, sucursal, socio: socioActual, periodos, tipoCuotaNombre: tipoNombre,
-      });
+      setRecibo({ pago: pago as Pago, sucursal, socio: socioActual, periodos, tipoCuotaNombre: tipoNombre });
+      toast.success(`Recibo ${formatNumeroRecibo(sucursal.codigo, nuevoNum)} emitido`);
       setSocioId(''); setDeudas([]); setSeleccionadas([]);
     } catch (err: any) {
-      alert('Error inesperado: ' + (err.message || err));
+      toast.error('Error inesperado: ' + (err.message || err));
     } finally { setCobrando(false); }
   }
 
@@ -199,6 +215,7 @@ export default function CobranzaPage() {
 
   const socio = data.socios.find((s) => s.id === socioId);
   const importeSel = deudas.filter((d) => seleccionadas.includes(d.id)).reduce((s, d) => s + Number(d.importe), 0);
+  const todasSeleccionadas = deudas.length > 0 && seleccionadas.length === deudas.length;
 
   return (
     <div>
@@ -209,27 +226,27 @@ export default function CobranzaPage() {
       )}
 
       <div className="card">
-        <div className="row">
-          <div className="field" style={{ flex: 1 }}>
+        <div className="row" style={{ marginBottom: 12 }}>
+          <div className="field" style={{ flex: 1, minWidth: 180 }}>
             <label>Sucursal (talonario)</label>
             <select value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
               {data.sucursales.map((s) => <option key={s.id} value={s.id}>{s.codigo} - {s.nombre}</option>)}
             </select>
           </div>
-          <div className="field" style={{ flex: 2 }}>
-            <label>Socio</label>
-            <select value={socioId} onChange={(e) => { setSocioId(e.target.value); cargarDeudas(e.target.value); }}>
-              <option value="">Seleccionar socio...</option>
-              {data.socios.map((s) => (
-                <option key={s.id} value={s.id}>{s.numero} - {s.nombre}{s.debito_automatico ? ' [DA]' : ''}</option>
-              ))}
-            </select>
-          </div>
+        </div>
+
+        <div className="field">
+          <label>Socio</label>
+          <SocioSearchInput
+            socios={data.socios}
+            selectedId={socioId}
+            onSelect={(id) => { setSocioId(id); cargarDeudas(id); }}
+          />
         </div>
 
         {socio && deudas.length === 0 && (
           <div className="banner warning" style={{ marginTop: 12 }}>
-            {socio.nombre} no tiene cuotas pendientes registradas.
+            <strong>{socio.nombre}</strong> no tiene cuotas pendientes registradas.
             {socio.tipo_cuota_id && (
               <> <button onClick={generarDeudaSiNoTiene} style={{ marginLeft: 8 }}>Generar cuota del mes actual</button></>
             )}
@@ -238,7 +255,12 @@ export default function CobranzaPage() {
 
         {socio && deudas.length > 0 && (
           <>
-            <h3 style={{ marginTop: 16 }}>Cuotas pendientes</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+              <h3 style={{ marginBottom: 0 }}>Cuotas pendientes</h3>
+              <button onClick={toggleAll} style={{ fontSize: 12, padding: '4px 10px' }}>
+                {todasSeleccionadas ? 'Deseleccionar todas' : 'Seleccionar todas'}
+              </button>
+            </div>
             <div style={{ background: 'var(--surface-2)', padding: 8, borderRadius: 'var(--radius)', marginBottom: 12 }}>
               {deudas.map((d) => {
                 const tipo = data.tipos.find((t) => t.id === d.tipo_id);
@@ -283,11 +305,14 @@ export default function CobranzaPage() {
 }
 
 function ReciboGeneradoModal({ recibo, club, onClose }: { recibo: ReciboGenerado; club: Club; onClose: () => void }) {
+  const toast = useToast();
+
   function descargarPDF() {
     descargarReciboPDF({
       pago: recibo.pago, sucursal: recibo.sucursal, socio: recibo.socio, club,
       periodos: recibo.periodos, tipoCuotaNombre: recibo.tipoCuotaNombre,
     });
+    toast.success('PDF descargado');
   }
 
   function enviarWhatsapp() {
@@ -313,12 +338,8 @@ function ReciboGeneradoModal({ recibo, club, onClose }: { recibo: ReciboGenerado
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="banner success">Recibo emitido correctamente</div>
         <ReciboVisual
-          pago={recibo.pago}
-          sucursal={recibo.sucursal}
-          socio={recibo.socio}
-          club={club}
-          periodos={recibo.periodos}
-          tipoCuotaNombre={recibo.tipoCuotaNombre}
+          pago={recibo.pago} sucursal={recibo.sucursal} socio={recibo.socio} club={club}
+          periodos={recibo.periodos} tipoCuotaNombre={recibo.tipoCuotaNombre}
         />
         <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>
           <button onClick={descargarPDF}>📄 Descargar PDF</button>

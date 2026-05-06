@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { fmtDate, todayISO } from '@/lib/utils';
+import { fmtDate, todayISO, normalize } from '@/lib/utils';
+import { useToast } from '@/components/Toast';
 import type { Socio, TipoCuota } from '@/lib/types';
 
 const MOTIVOS_BAJA = ['Renuncia voluntaria', 'Mora prolongada', 'Fallecimiento', 'Traslado', 'Falta de uso', 'Otro'];
 
 export default function SociosPage() {
   const supabase = createClient();
+  const toast = useToast();
   const [socios, setSocios] = useState<Socio[]>([]);
   const [tipos, setTipos] = useState<TipoCuota[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,10 +36,12 @@ export default function SociosPage() {
       const max = socios.reduce((m, x) => Math.max(m, x.numero), 0);
       const nuevo = { ...s, numero: max + 1, fecha_alta: s.fecha_alta || todayISO() };
       const { error } = await supabase.from('socios').insert(nuevo as any);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
+      toast.success('Socio creado');
     } else if (editing) {
       const { error } = await supabase.from('socios').update(s).eq('id', editing.id);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
+      toast.success('Socio actualizado');
     }
     setEditing(null);
     cargar();
@@ -48,7 +52,8 @@ export default function SociosPage() {
       .from('socios')
       .update({ fecha_baja: fecha, motivo_baja: motivo, motivo_baja_otro: otro || null })
       .eq('id', socio.id);
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success(`${socio.nombre} dado de baja`);
     setEditing(null);
     cargar();
   }
@@ -59,17 +64,23 @@ export default function SociosPage() {
       .from('socios')
       .update({ fecha_baja: null, motivo_baja: null, motivo_baja_otro: null })
       .eq('id', socio.id);
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success(`${socio.nombre} reincorporado`);
     cargar();
   }
 
   const tiposMap = new Map(tipos.map((t) => [t.id, t.nombre]));
+  const q = normalize(search);
   const filtered = socios.filter((s) => {
     if (filtroEstado === 'activos' && s.fecha_baja) return false;
     if (filtroEstado === 'bajas' && !s.fecha_baja) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (s.nombre || '').toLowerCase().includes(q) || (s.dni || '').includes(q) || (s.telefono || '').includes(q);
+    if (q) {
+      return (
+        normalize(s.nombre).includes(q) ||
+        String(s.numero).includes(q) ||
+        (s.dni && s.dni.includes(q)) ||
+        (s.telefono && s.telefono.includes(q))
+      );
     }
     return true;
   });
@@ -85,7 +96,7 @@ export default function SociosPage() {
         <div className="row">
           <div className="field" style={{ flex: 2 }}>
             <label>Buscar</label>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nombre, DNI o teléfono..." />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nombre, número, DNI o teléfono..." />
           </div>
           <div className="field" style={{ flex: '0 0 auto' }}>
             <label>Mostrar</label>
@@ -102,39 +113,67 @@ export default function SociosPage() {
         {loading ? <div className="empty">Cargando...</div> : filtered.length === 0 ? (
           <div className="empty">Sin socios</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 60 }}>N°</th>
-                <th>Nombre</th>
-                <th style={{ width: 110 }}>DNI</th>
-                <th>Tipo cuota</th>
-                <th style={{ width: 110 }}>Alta</th>
-                <th style={{ width: 90 }}>Estado</th>
-                <th style={{ width: 60 }}>DA</th>
-                <th style={{ width: 180 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.numero}</td>
-                  <td>{s.nombre}</td>
-                  <td>{s.dni || '-'}</td>
-                  <td>{tiposMap.get(s.tipo_cuota_id || '') || '-'}</td>
-                  <td>{fmtDate(s.fecha_alta)}</td>
-                  <td>{s.fecha_baja ? <span className="badge inactive">Baja</span> : <span className="badge active">Activo</span>}</td>
-                  <td>{s.debito_automatico && <span className="badge debito">DA</span>}</td>
-                  <td>
-                    <div className="actions">
-                      <button onClick={() => setEditing(s)}>Editar</button>
-                      {s.fecha_baja && <button onClick={() => handleReincorporar(s)}>Reincorp.</button>}
-                    </div>
-                  </td>
+          <>
+            {/* Desktop tabla */}
+            <table className="desktop-only">
+              <thead>
+                <tr>
+                  <th style={{ width: 60 }}>N°</th>
+                  <th>Nombre</th>
+                  <th style={{ width: 110 }}>DNI</th>
+                  <th>Tipo cuota</th>
+                  <th style={{ width: 110 }}>Alta</th>
+                  <th style={{ width: 90 }}>Estado</th>
+                  <th style={{ width: 60 }}>DA</th>
+                  <th style={{ width: 180 }}></th>
                 </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.numero}</td>
+                    <td>{s.nombre}</td>
+                    <td>{s.dni || '-'}</td>
+                    <td>{tiposMap.get(s.tipo_cuota_id || '') || '-'}</td>
+                    <td>{fmtDate(s.fecha_alta)}</td>
+                    <td>{s.fecha_baja ? <span className="badge inactive">Baja</span> : <span className="badge active">Activo</span>}</td>
+                    <td>{s.debito_automatico && <span className="badge debito">DA</span>}</td>
+                    <td>
+                      <div className="actions">
+                        <button onClick={() => setEditing(s)}>Editar</button>
+                        {s.fecha_baja && <button onClick={() => handleReincorporar(s)}>Reincorp.</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {/* Mobile cards */}
+            <div className="mobile-only" style={{ padding: 8 }}>
+              {filtered.map((s) => (
+                <div key={s.id} className="socio-card">
+                  <div className="socio-card-head">
+                    <div>
+                      <span className="socio-card-num">#{s.numero}</span>{' '}
+                      <span className="socio-card-title">{s.nombre}</span>
+                    </div>
+                    <div>
+                      {s.fecha_baja ? <span className="badge inactive">Baja</span> : <span className="badge active">Activo</span>}
+                      {s.debito_automatico && <span className="badge debito" style={{ marginLeft: 4 }}>DA</span>}
+                    </div>
+                  </div>
+                  <div className="socio-card-info">
+                    {s.dni && <>DNI: {s.dni} · </>}{tiposMap.get(s.tipo_cuota_id || '') || 'Sin tipo'}
+                  </div>
+                  {s.telefono && <div className="socio-card-info">📞 {s.telefono}</div>}
+                  <div className="socio-card-actions">
+                    <button onClick={() => setEditing(s)}>Editar</button>
+                    {s.fecha_baja && <button onClick={() => handleReincorporar(s)}>Reincorporar</button>}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -158,6 +197,7 @@ function SocioForm({ socio, tipos, onClose, onSave, onBaja }: {
   onSave: (s: Partial<Socio>) => void;
   onBaja: (s: Socio, fecha: string, motivo: string, otro: string) => void;
 }) {
+  const toast = useToast();
   const [data, setData] = useState<Partial<Socio>>(
     socio || { nombre: '', dni: '', telefono: '', email: '', tipo_cuota_id: '', fecha_alta: todayISO(), debito_automatico: false }
   );
@@ -168,7 +208,7 @@ function SocioForm({ socio, tipos, onClose, onSave, onBaja }: {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!data.nombre?.trim()) { alert('Falta el nombre'); return; }
+    if (!data.nombre?.trim()) { toast.warning('Falta el nombre'); return; }
     onSave({ ...data, tipo_cuota_id: data.tipo_cuota_id || null });
   }
 

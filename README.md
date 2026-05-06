@@ -1,14 +1,10 @@
-# Cobranza Club v3
+# Cobranza Club v4
 
-Sistema de cobro de cuotas para clubes con:
-- Gestión de socios, cuotas y talonarios
-- Cobranza con recibos numerados por sucursal
-- Recibos profesionales descargables en PDF
-- Rendiciones de cobradores con aprobación del admin
-- Auditoría de operaciones
-- Roles: admin, cobrador, consulta
+Sistema de cobro de cuotas con UX mejorada:
+- Búsqueda rápida de socios al cobrar
+- Notificaciones tipo toast
+- Mobile con menú hamburguesa y cards en lugar de tablas
 
 ## Variables de entorno
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY

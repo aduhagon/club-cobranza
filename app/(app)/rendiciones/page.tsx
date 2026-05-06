@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fmtMoney, fmtDate, fmtDateTime, formatNumeroRecibo, todayISO } from '@/lib/utils';
+import { useToast } from '@/components/Toast';
 import type { Rendicion, Pago, Sucursal, Socio, Usuario } from '@/lib/types';
 
 export default function RendicionesPage() {
@@ -53,38 +54,52 @@ export default function RendicionesPage() {
       </div>
 
       <div className="banner info">
-        Una rendición agrupa los recibos cobrados por un cobrador en un período. El cobrador la cierra al entregar el dinero,
-        y luego el administrador la <strong>aprueba</strong> o <strong>rechaza</strong>. Una rendición aprobada queda como registro definitivo.
+        Una rendición agrupa los recibos cobrados en un período. El cobrador la cierra al entregar el dinero,
+        y luego el administrador la <strong>aprueba</strong> o <strong>rechaza</strong>.
       </div>
 
       <div className="card" style={{ padding: 0 }}>
         {loading ? <div className="empty">Cargando...</div> : rendiciones.length === 0 ? (
           <div className="empty">Sin rendiciones</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Cobrador</th>
-                <th style={{ width: 110 }}>Desde</th>
-                <th style={{ width: 110 }}>Hasta</th>
-                <th style={{ width: 130 }}>Total</th>
-                <th style={{ width: 170 }}>Estado</th>
-                <th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rendiciones.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.cobrador}</td>
-                  <td>{fmtDate(r.semana_inicio)}</td>
-                  <td>{fmtDate(r.semana_fin)}</td>
-                  <td>{fmtMoney(r.total_cerrado)}</td>
-                  <td>{badgeEstado(r.estado)}</td>
-                  <td><button onClick={() => setVerRendicion(r)}>Ver</button></td>
+          <>
+            <table className="desktop-only">
+              <thead>
+                <tr>
+                  <th>Cobrador</th>
+                  <th style={{ width: 110 }}>Desde</th>
+                  <th style={{ width: 110 }}>Hasta</th>
+                  <th style={{ width: 130 }}>Total</th>
+                  <th style={{ width: 170 }}>Estado</th>
+                  <th style={{ width: 80 }}></th>
                 </tr>
+              </thead>
+              <tbody>
+                {rendiciones.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.cobrador}</td>
+                    <td>{fmtDate(r.semana_inicio)}</td>
+                    <td>{fmtDate(r.semana_fin)}</td>
+                    <td>{fmtMoney(r.total_cerrado)}</td>
+                    <td>{badgeEstado(r.estado)}</td>
+                    <td><button onClick={() => setVerRendicion(r)}>Ver</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mobile-only" style={{ padding: 8 }}>
+              {rendiciones.map((r) => (
+                <div key={r.id} className="pago-card" onClick={() => setVerRendicion(r)}>
+                  <div className="pago-card-head">
+                    <span style={{ fontWeight: 500 }}>{r.cobrador}</span>
+                    {badgeEstado(r.estado)}
+                  </div>
+                  <div className="pago-card-info">{fmtDate(r.semana_inicio)} - {fmtDate(r.semana_fin)}</div>
+                  <div className="pago-card-importe">{fmtMoney(r.total_cerrado)}</div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -106,6 +121,7 @@ function CrearRendicionModal({ yo, cobradores, onClose, onSaved }: {
   onSaved: () => void;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [cobradorId, setCobradorId] = useState(yo.rol === 'cobrador' ? yo.id : (cobradores[0]?.id || ''));
   const [desde, setDesde] = useState(todayISO());
   const [hasta, setHasta] = useState(todayISO());
@@ -119,21 +135,14 @@ function CrearRendicionModal({ yo, cobradores, onClose, onSaved }: {
     setCargando(true);
 
     const { data: pagosData } = await supabase
-      .from('pagos')
-      .select('*')
-      .eq('cobrador_id', cobradorId)
-      .eq('anulado', false)
-      .gte('fecha_pago', desde)
-      .lte('fecha_pago', hasta)
-      .order('fecha_pago');
+      .from('pagos').select('*')
+      .eq('cobrador_id', cobradorId).eq('anulado', false)
+      .gte('fecha_pago', desde).lte('fecha_pago', hasta).order('fecha_pago');
 
     const ids = (pagosData || []).map((p: any) => p.id);
     let idsEnRendicion = new Set<string>();
     if (ids.length > 0) {
-      const { data: rendPagos } = await supabase
-        .from('rendiciones_pagos')
-        .select('pago_id')
-        .in('pago_id', ids);
+      const { data: rendPagos } = await supabase.from('rendiciones_pagos').select('pago_id').in('pago_id', ids);
       idsEnRendicion = new Set((rendPagos || []).map((r: any) => r.pago_id));
     }
 
@@ -141,14 +150,20 @@ function CrearRendicionModal({ yo, cobradores, onClose, onSaved }: {
     setPagos(disponibles);
     setSeleccionados(disponibles.map((p) => p.id));
     setCargando(false);
+    if (disponibles.length === 0) toast.info('No hay pagos disponibles para rendir en ese rango');
   }
 
   function toggle(id: string) {
     setSeleccionados((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }
 
+  function toggleAll() {
+    if (seleccionados.length === pagos.length) setSeleccionados([]);
+    else setSeleccionados(pagos.map((p) => p.id));
+  }
+
   async function guardar() {
-    if (seleccionados.length === 0) { alert('Seleccioná al menos un pago'); return; }
+    if (seleccionados.length === 0) { toast.warning('Seleccioná al menos un pago'); return; }
     setGuardando(true);
 
     try {
@@ -159,17 +174,15 @@ function CrearRendicionModal({ yo, cobradores, onClose, onSaved }: {
       const { data: rend, error } = await supabase.from('rendiciones').insert({
         cobrador: cobradorSel?.nombre || '-',
         cobrador_id: cobradorId,
-        semana_inicio: desde,
-        semana_fin: hasta,
-        total_cerrado: total,
-        estado: 'cerrada',
+        semana_inicio: desde, semana_fin: hasta,
+        total_cerrado: total, estado: 'cerrada',
       }).select().single();
 
-      if (error) { alert('Error: ' + error.message); setGuardando(false); return; }
+      if (error) { toast.error('Error: ' + error.message); setGuardando(false); return; }
 
       const links = pagosSel.map((p) => ({ rendicion_id: rend.id, pago_id: p.id }));
       const { error: e2 } = await supabase.from('rendiciones_pagos').insert(links);
-      if (e2) { alert('Error vinculando pagos: ' + e2.message); setGuardando(false); return; }
+      if (e2) { toast.error('Error vinculando pagos: ' + e2.message); setGuardando(false); return; }
 
       await supabase.from('auditoria').insert({
         usuario: yo.nombre, rol: yo.rol, accion: 'rendicion_creada',
@@ -177,15 +190,15 @@ function CrearRendicionModal({ yo, cobradores, onClose, onSaved }: {
         datos: { rendicion_id: rend.id, total }, prev_hash: '0', hash: '0',
       });
 
+      toast.success('Rendición creada');
       onSaved();
     } catch (err: any) {
-      alert('Error: ' + (err.message || err));
-    } finally {
-      setGuardando(false);
-    }
+      toast.error('Error: ' + (err.message || err));
+    } finally { setGuardando(false); }
   }
 
   const totalSel = pagos.filter((p) => seleccionados.includes(p.id)).reduce((s, p) => s + Number(p.importe), 0);
+  const todosSel = pagos.length > 0 && seleccionados.length === pagos.length;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -217,10 +230,15 @@ function CrearRendicionModal({ yo, cobradores, onClose, onSaved }: {
 
         {pagos.length > 0 && (
           <>
-            <div className="banner info">
-              {seleccionados.length} de {pagos.length} pagos seleccionados · Total: <strong>{fmtMoney(totalSel)}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <div className="banner info" style={{ flex: 1, marginRight: 8, marginBottom: 0 }}>
+                {seleccionados.length} de {pagos.length} pagos · Total: <strong>{fmtMoney(totalSel)}</strong>
+              </div>
+              <button onClick={toggleAll} style={{ fontSize: 12, padding: '4px 10px' }}>
+                {todosSel ? 'Ninguno' : 'Todos'}
+              </button>
             </div>
-            <div style={{ maxHeight: 250, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 4 }}>
+            <div style={{ maxHeight: 250, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 4, marginTop: 8 }}>
               {pagos.map((p) => (
                 <label key={p.id} style={{ display: 'flex', alignItems: 'center', padding: '6px 8px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={seleccionados.includes(p.id)} onChange={() => toggle(p.id)} />
@@ -255,6 +273,7 @@ function DetalleRendicionModal({ rendicion, yo, onClose, onChanged }: {
   onChanged: () => void;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [socios, setSocios] = useState<Socio[]>([]);
@@ -282,19 +301,20 @@ function DetalleRendicionModal({ rendicion, yo, onClose, onChanged }: {
   const sociosMap = new Map(socios.map((s) => [s.id, s]));
 
   async function aprobar() {
-    if (!confirm('¿Aprobar la rendición? Quedará cerrada y no podrá modificarse.')) return;
+    if (!confirm('¿Aprobar la rendición? No podrá modificarse.')) return;
     setAccionando(true);
     const { error } = await supabase
       .from('rendiciones')
       .update({ estado: 'aprobada', fecha_aprobacion: new Date().toISOString(), aprobada_por: yo.nombre })
       .eq('id', rendicion.id);
-    if (error) { alert('Error: ' + error.message); setAccionando(false); return; }
+    if (error) { toast.error('Error: ' + error.message); setAccionando(false); return; }
     await supabase.from('auditoria').insert({
       usuario: yo.nombre, rol: yo.rol, accion: 'rendicion_aprobada',
       detalle: `Rendición aprobada por ${yo.nombre}`,
       datos: { rendicion_id: rendicion.id, total: rendicion.total_cerrado },
       prev_hash: '0', hash: '0',
     });
+    toast.success('Rendición aprobada');
     onChanged();
   }
 
@@ -306,13 +326,14 @@ function DetalleRendicionModal({ rendicion, yo, onClose, onChanged }: {
       .from('rendiciones')
       .update({ estado: 'rechazada', fecha_rechazo: new Date().toISOString(), rechazada_por: yo.nombre, motivo_rechazo: motivo })
       .eq('id', rendicion.id);
-    if (error) { alert('Error: ' + error.message); setAccionando(false); return; }
+    if (error) { toast.error('Error: ' + error.message); setAccionando(false); return; }
     await supabase.from('auditoria').insert({
       usuario: yo.nombre, rol: yo.rol, accion: 'rendicion_rechazada',
       detalle: `Rendición rechazada: ${motivo}`,
       datos: { rendicion_id: rendicion.id, motivo },
       prev_hash: '0', hash: '0',
     });
+    toast.warning('Rendición rechazada');
     onChanged();
   }
 

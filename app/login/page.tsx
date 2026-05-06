@@ -3,22 +3,22 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/Toast';
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setError('Email o contraseña incorrectos');
+      toast.error('Email o contraseña incorrectos');
       setLoading(false);
     } else {
       router.push('/');
@@ -30,7 +30,6 @@ export default function LoginPage() {
     <div className="login-page">
       <form className="login-box" onSubmit={handleSubmit}>
         <h1>Cobranza Club</h1>
-        {error && <div className="banner danger">{error}</div>}
         <div className="field">
           <label>Email</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />

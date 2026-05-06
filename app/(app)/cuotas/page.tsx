@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fmtMoney, fmtMesLargo, thisMonth } from '@/lib/utils';
+import { useToast } from '@/components/Toast';
 import type { TipoCuota, ValorCuota } from '@/lib/types';
 
 export default function CuotasPage() {
   const supabase = createClient();
+  const toast = useToast();
   const [tipos, setTipos] = useState<TipoCuota[]>([]);
   const [valores, setValores] = useState<ValorCuota[]>([]);
   const [editingTipo, setEditingTipo] = useState<TipoCuota | 'new' | null>(null);
@@ -26,10 +28,12 @@ export default function CuotasPage() {
   async function saveTipo(t: Partial<TipoCuota>) {
     if (editingTipo === 'new') {
       const { error } = await supabase.from('tipos_cuota').insert(t as any);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
+      toast.success('Tipo creado');
     } else if (editingTipo) {
       const { error } = await supabase.from('tipos_cuota').update(t).eq('id', editingTipo.id);
-      if (error) { alert('Error: ' + error.message); return; }
+      if (error) { toast.error('Error: ' + error.message); return; }
+      toast.success('Tipo actualizado');
     }
     setEditingTipo(null);
     cargar();
@@ -38,13 +42,15 @@ export default function CuotasPage() {
   async function delTipo(id: string) {
     if (!confirm('¿Eliminar este tipo y todos sus valores?')) return;
     const { error } = await supabase.from('tipos_cuota').delete().eq('id', id);
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success('Tipo eliminado');
     cargar();
   }
 
   async function saveValor(tipoId: string, desde: string, importe: number) {
     const { error } = await supabase.from('valores_cuota').insert({ tipo_id: tipoId, desde, importe });
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success('Valor cargado');
     setAddingValor(false);
     cargar();
   }
@@ -52,7 +58,8 @@ export default function CuotasPage() {
   async function delValor(id: string) {
     if (!confirm('¿Eliminar este valor?')) return;
     const { error } = await supabase.from('valores_cuota').delete().eq('id', id);
-    if (error) { alert('Error: ' + error.message); return; }
+    if (error) { toast.error('Error: ' + error.message); return; }
+    toast.success('Valor eliminado');
     cargar();
   }
 
@@ -63,13 +70,13 @@ export default function CuotasPage() {
       <div className="main-header">
         <h1>Cuotas</h1>
         <div className="actions">
-          <button onClick={() => setEditingTipo('new')}>+ Tipo de cuota</button>
+          <button onClick={() => setEditingTipo('new')}>+ Tipo</button>
           <button className="primary" onClick={() => setAddingValor(true)} disabled={tipos.length === 0}>+ Cargar valor</button>
         </div>
       </div>
 
       <div className="banner info">
-        Cada tipo de cuota tiene valores con fecha de vigencia. Cuando se devenga un mes, el sistema usa el valor más reciente cuya fecha de vigencia sea anterior o igual al mes que se está devengando.
+        Cada tipo de cuota tiene valores con fecha de vigencia. Al devengarse un mes se usa el valor más reciente cuya vigencia sea anterior o igual a ese mes.
       </div>
 
       <div className="card">

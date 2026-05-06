@@ -5,10 +5,12 @@ import { createClient } from '@/lib/supabase/client';
 import { fmtMoney, fmtDate, formatNumeroRecibo, fmtMesLargo } from '@/lib/utils';
 import { descargarReciboPDF } from '@/lib/recibo-pdf';
 import ReciboVisual from '@/components/ReciboVisual';
+import { useToast } from '@/components/Toast';
 import type { Pago, Sucursal, Socio, Club, TipoCuota } from '@/lib/types';
 
 export default function RecibosPage() {
   const supabase = createClient();
+  const toast = useToast();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [socios, setSocios] = useState<Socio[]>([]);
@@ -57,7 +59,7 @@ export default function RecibosPage() {
         fecha_anulacion: new Date().toISOString(), motivo_anulacion: motivo,
       })
       .eq('id', pago.id);
-    if (e1) { alert('Error: ' + e1.message); return; }
+    if (e1) { toast.error('Error: ' + e1.message); return; }
 
     const { data: links } = await supabase.from('pagos_devengamientos').select('devengamiento_id').eq('pago_id', pago.id);
     const ids = (links || []).map((l: any) => l.devengamiento_id);
@@ -71,6 +73,7 @@ export default function RecibosPage() {
       prev_hash: '0', hash: '0',
     });
 
+    toast.success('Recibo anulado');
     cargar();
     setDetalle(null);
   }
@@ -112,39 +115,59 @@ export default function RecibosPage() {
         {loading ? <div className="empty">Cargando...</div> : filtrados.length === 0 ? (
           <div className="empty">Sin recibos</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 150 }}>Recibo</th>
-                <th style={{ width: 100 }}>Fecha</th>
-                <th>Socio</th>
-                <th>Cobrador</th>
-                <th style={{ width: 120 }}>Medio</th>
-                <th style={{ width: 110 }}>Importe</th>
-                <th style={{ width: 90 }}>Estado</th>
-                <th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <table className="desktop-only">
+              <thead>
+                <tr>
+                  <th style={{ width: 150 }}>Recibo</th>
+                  <th style={{ width: 100 }}>Fecha</th>
+                  <th>Socio</th>
+                  <th>Cobrador</th>
+                  <th style={{ width: 120 }}>Medio</th>
+                  <th style={{ width: 110 }}>Importe</th>
+                  <th style={{ width: 90 }}>Estado</th>
+                  <th style={{ width: 80 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map((p) => {
+                  const suc = sucursalesMap.get(p.sucursal_id);
+                  const socio = sociosMap.get(p.socio_id);
+                  const num = suc ? formatNumeroRecibo(suc.codigo, p.numero) : '?';
+                  return (
+                    <tr key={p.id} style={p.anulado ? { opacity: 0.5 } : {}}>
+                      <td className="recibo-num">{num}</td>
+                      <td>{fmtDate(p.fecha_pago)}</td>
+                      <td>{socio?.nombre || '-'}</td>
+                      <td>{p.cobrador || '-'}</td>
+                      <td>{p.medio}</td>
+                      <td>{fmtMoney(p.importe)}</td>
+                      <td>{p.anulado ? <span className="badge warning">Anulado</span> : <span className="badge active">Vigente</span>}</td>
+                      <td><button onClick={() => setDetalle(p)}>Ver</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="mobile-only" style={{ padding: 8 }}>
               {filtrados.map((p) => {
                 const suc = sucursalesMap.get(p.sucursal_id);
                 const socio = sociosMap.get(p.socio_id);
                 const num = suc ? formatNumeroRecibo(suc.codigo, p.numero) : '?';
                 return (
-                  <tr key={p.id} style={p.anulado ? { opacity: 0.5 } : {}}>
-                    <td className="recibo-num">{num}</td>
-                    <td>{fmtDate(p.fecha_pago)}</td>
-                    <td>{socio?.nombre || '-'}</td>
-                    <td>{p.cobrador || '-'}</td>
-                    <td>{p.medio}</td>
-                    <td>{fmtMoney(p.importe)}</td>
-                    <td>{p.anulado ? <span className="badge warning">Anulado</span> : <span className="badge active">Vigente</span>}</td>
-                    <td><button onClick={() => setDetalle(p)}>Ver</button></td>
-                  </tr>
+                  <div key={p.id} className="pago-card" style={p.anulado ? { opacity: 0.5 } : {}} onClick={() => setDetalle(p)}>
+                    <div className="pago-card-head">
+                      <span className="pago-card-num">{num}</span>
+                      {p.anulado ? <span className="badge warning">Anulado</span> : <span className="badge active">Vigente</span>}
+                    </div>
+                    <div className="pago-card-info">{fmtDate(p.fecha_pago)} · {p.medio}</div>
+                    <div className="pago-card-info">Socio: {socio?.nombre || '-'}</div>
+                    <div className="pago-card-importe">{fmtMoney(p.importe)}</div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -175,6 +198,7 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
   onClose: () => void;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [periodos, setPeriodos] = useState<string[]>([]);
   const [tipoCuotaNombre, setTipoCuotaNombre] = useState<string | undefined>();
   const [loadingDet, setLoadingDet] = useState(true);
@@ -203,9 +227,8 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
 
   function descargarPDF() {
     if (!suc || !socio) return;
-    descargarReciboPDF({
-      pago, sucursal: suc, socio, club, periodos, tipoCuotaNombre,
-    });
+    descargarReciboPDF({ pago, sucursal: suc, socio, club, periodos, tipoCuotaNombre });
+    toast.success('PDF descargado');
   }
 
   function enviarWhatsapp() {
@@ -239,7 +262,7 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
             <button className="danger" onClick={() => {
               const motivo = prompt('Motivo de anulación:');
               if (motivo) onAnular(pago, motivo);
-            }}>Anular recibo</button>
+            }}>Anular</button>
           )}
           <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
             <button onClick={descargarPDF}>📄 PDF</button>

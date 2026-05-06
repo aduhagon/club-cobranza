@@ -48,25 +48,45 @@ export default async function DashboardPage() {
         {!recientes || recientes.length === 0 ? (
           <div className="empty">Aún no hay cobros registrados</div>
         ) : (
-          <table>
-            <thead>
-              <tr><th>Recibo</th><th>Fecha</th><th>Socio</th><th>Cobrador</th><th>Importe</th></tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop: tabla */}
+            <table className="desktop-only">
+              <thead>
+                <tr><th>Recibo</th><th>Fecha</th><th>Socio</th><th>Cobrador</th><th>Importe</th></tr>
+              </thead>
+              <tbody>
+                {recientes.map((p) => {
+                  const codigo = sucursalesMap.get(p.sucursal_id) || '?';
+                  return (
+                    <tr key={p.id} style={p.anulado ? { opacity: 0.5, textDecoration: 'line-through' } : {}}>
+                      <td className="recibo-num">{formatNumeroRecibo(codigo, p.numero)}</td>
+                      <td>{fmtDate(p.fecha_pago)}</td>
+                      <td>{sociosMap.get(p.socio_id) || '-'}</td>
+                      <td>{p.cobrador || '-'}</td>
+                      <td>{fmtMoney(p.importe)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {/* Mobile: cards */}
+            <div className="mobile-only">
               {recientes.map((p) => {
                 const codigo = sucursalesMap.get(p.sucursal_id) || '?';
                 return (
-                  <tr key={p.id} style={p.anulado ? { opacity: 0.5, textDecoration: 'line-through' } : {}}>
-                    <td className="recibo-num">{formatNumeroRecibo(codigo, p.numero)}</td>
-                    <td>{fmtDate(p.fecha_pago)}</td>
-                    <td>{sociosMap.get(p.socio_id) || '-'}</td>
-                    <td>{p.cobrador || '-'}</td>
-                    <td>{fmtMoney(p.importe)}</td>
-                  </tr>
+                  <div key={p.id} className="pago-card" style={p.anulado ? { opacity: 0.5 } : {}}>
+                    <div className="pago-card-head">
+                      <span className="pago-card-num">{formatNumeroRecibo(codigo, p.numero)}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{fmtDate(p.fecha_pago)}</span>
+                    </div>
+                    <div className="pago-card-info">{sociosMap.get(p.socio_id) || '-'}</div>
+                    <div className="pago-card-info">Cobrador: {p.cobrador || '-'}</div>
+                    <div className="pago-card-importe">{fmtMoney(p.importe)}</div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
     </div>

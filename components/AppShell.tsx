@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Rol } from '@/lib/types';
 
@@ -10,10 +11,11 @@ interface Props {
   rol: Rol;
 }
 
-export default function Sidebar({ nombre, rol }: Props) {
+export default function AppShell({ nombre, rol }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const [open, setOpen] = useState(false);
 
   async function logout() {
     await supabase.auth.signOut();
@@ -43,23 +45,34 @@ export default function Sidebar({ nombre, rol }: Props) {
   const nav = rol === 'admin' ? navAdmin : rol === 'cobrador' ? navCobrador : navConsulta;
   const rolLabel = rol === 'admin' ? 'Administrador' : rol === 'cobrador' ? 'Cobrador' : 'Consulta';
 
+  function close() { setOpen(false); }
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">Cobranza Club</div>
-      <nav className="sidebar-nav">
-        {nav.map((item) => (
-          <Link key={item.href} href={item.href} className={pathname === item.href ? 'active' : ''}>
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="sidebar-user">
-        <div style={{ fontWeight: 500, color: 'var(--text)' }}>{nombre}</div>
-        <div>{rolLabel}</div>
-        <button onClick={logout} style={{ marginTop: 8, width: '100%', padding: '6px 10px' }}>
-          Cerrar sesión
-        </button>
+    <>
+      <div className="topbar-mobile">
+        <button className="menu-btn" onClick={() => setOpen(true)} aria-label="Menú">☰</button>
+        <span className="brand">Cobranza Club</span>
       </div>
-    </aside>
+
+      <div className={`mobile-overlay ${open ? 'show' : ''}`} onClick={close} />
+
+      <aside className={`sidebar ${open ? 'open' : ''}`}>
+        <div className="sidebar-brand">Cobranza Club</div>
+        <nav className="sidebar-nav">
+          {nav.map((item) => (
+            <Link key={item.href} href={item.href} className={pathname === item.href ? 'active' : ''} onClick={close}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="sidebar-user">
+          <div style={{ fontWeight: 500, color: 'var(--text)' }}>{nombre}</div>
+          <div>{rolLabel}</div>
+          <button onClick={logout} style={{ marginTop: 8, width: '100%', padding: '6px 10px' }}>
+            Cerrar sesión
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
