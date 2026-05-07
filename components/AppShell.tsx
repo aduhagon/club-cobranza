@@ -29,6 +29,7 @@ export default function AppShell({ nombre, rol, club }: Props) {
     { href: '/cobranza', label: 'Cobrar' },
     { href: '/recibos', label: 'Recibos' },
     { href: '/rendiciones', label: 'Rendiciones' },
+    { href: '/reportes', label: 'Reportes' },
     { href: '/procesos', label: 'Procesos masivos' },
     { href: '/importar', label: 'Importar socios' },
     { href: '/socios', label: 'Socios' },
@@ -40,6 +41,7 @@ export default function AppShell({ nombre, rol, club }: Props) {
     { href: '/cobranza', label: 'Cobrar' },
     { href: '/recibos', label: 'Mis recibos' },
     { href: '/rendiciones', label: 'Mis rendiciones' },
+    { href: '/reportes', label: 'Mis reportes' },
   ];
   const navConsulta = [
     { href: '/', label: 'Inicio' },

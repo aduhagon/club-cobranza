@@ -1,12 +1,15 @@
-# Cobranza Club v9
+# Cobranza Club v10
 
-Importación masiva de socios desde Excel:
-- Plantilla Excel descargable con instrucciones
-- Validación previa con detalle de errores fila por fila
-- Importación con saltar errores y seguir
-- Reporte final con cantidad de OK y errores
+Reportes con tabs:
+- Cobranzas: total recaudado, por medio de pago, por cobrador, por sucursal, detalle
+- Devengamientos: devengado vs cobrado vs pendiente, tasa de cobranza, por tipo
+- Morosidad: socios morosos, antigüedad de la deuda, recordatorios por WhatsApp
 
-Más todo lo del v8: pagos adelantados, asignación cobrador-socio, procesos masivos, identidad del club.
+Cada reporte se puede ver en pantalla, exportar a Excel o descargar como PDF con logo del club.
+
+Filtros: el cobrador ve solo sus números, el admin ve todo.
+
+Más todo lo de v9: importación masiva, pagos adelantados, asignación cobrador-socio, procesos masivos.
 
 ## Variables de entorno
 - NEXT_PUBLIC_SUPABASE_URL
