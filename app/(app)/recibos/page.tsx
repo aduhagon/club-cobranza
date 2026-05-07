@@ -7,6 +7,7 @@ import { descargarReciboPDF } from '@/lib/recibo-pdf';
 import ReciboVisual from '@/components/ReciboVisual';
 import { useToast } from '@/components/Toast';
 import type { Pago, Sucursal, Socio, Club, TipoCuota } from '@/lib/types';
+import { FileText } from 'lucide-react';
 
 export default function RecibosPage() {
   const supabase = createClient();
@@ -273,7 +274,7 @@ function DetalleRecibo({ pago, sucursales, socios, tipos, club, puedeAnular, onA
             }}>Anular</button>
           )}
           <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button onClick={descargarPDF} disabled={descargando}>{descargando ? '...' : '📄 PDF'}</button>
+            <button onClick={descargarPDF} disabled={descargando}><FileText size={16} />{descargando ? '...' : 'PDF'}</button>
             {!pago.anulado && <button onClick={enviarWhatsapp}>WhatsApp</button>}
             <button className="primary" onClick={onClose}>Cerrar</button>
           </div>

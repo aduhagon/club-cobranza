@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback } from 'react';
+import { CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
 
-type ToastTipo = 'success' | 'error' | 'info' | 'warning';
+type ToastTipo = 'success' | 'error' | 'info' | 'warning' | 'danger';
 interface Toast {
   id: number;
   tipo: ToastTipo;
@@ -33,6 +34,22 @@ export function useToast() {
   return ctx;
 }
 
+const ICONS: Record<ToastTipo, React.ComponentType<{ size?: number | string }>> = {
+  success: CheckCircle2,
+  error: XCircle,
+  danger: XCircle,
+  warning: AlertCircle,
+  info: Info,
+};
+
+const CLASSES: Record<ToastTipo, string> = {
+  success: 'success',
+  error: 'danger',
+  danger: 'danger',
+  warning: 'warning',
+  info: 'info',
+};
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -43,7 +60,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const show = useCallback((mensaje: string, tipo: ToastTipo = 'info') => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, tipo, mensaje }]);
-    setTimeout(() => remove(id), tipo === 'error' ? 5000 : 3000);
+    setTimeout(() => remove(id), tipo === 'error' || tipo === 'danger' ? 5000 : 3000);
   }, [remove]);
 
   const value: ToastContextValue = {
@@ -59,11 +76,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <div className="toast-container">
         {toasts.map((t) => {
-          const icon = t.tipo === 'success' ? '✓' : t.tipo === 'error' ? '✕' : t.tipo === 'warning' ? '⚠' : 'ℹ';
+          const Icon = ICONS[t.tipo];
           return (
-            <div key={t.id} className={`toast toast-${t.tipo}`} onClick={() => remove(t.id)}>
-              <span className="toast-icon">{icon}</span>
-              <span className="toast-msg">{t.mensaje}</span>
+            <div key={t.id} className={`toast ${CLASSES[t.tipo]}`} onClick={() => remove(t.id)}>
+              <Icon size={18} />
+              <span>{t.mensaje}</span>
             </div>
           );
         })}

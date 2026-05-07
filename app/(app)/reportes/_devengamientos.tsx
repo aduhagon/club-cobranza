@@ -6,6 +6,8 @@ import { useToast } from '@/components/Toast';
 import { fmtMoney, fmtMesLargo, thisMonth } from '@/lib/utils';
 import { exportarExcel, exportarPDF } from '@/lib/reportes';
 import type { Usuario, Club, Devengamiento, TipoCuota, Socio } from '@/lib/types';
+import { FileSpreadsheet, FileText } from 'lucide-react';
+import { SkeletonStats, SkeletonTable } from '@/components/Skeleton';
 
 interface ReporteData {
   devs: Devengamiento[];
@@ -193,7 +195,12 @@ export default function ReporteDevengamientos({ yo, club }: { yo: Usuario; club:
     toast.success('PDF descargado');
   }
 
-  if (cargando || !data) return <div className="empty">Cargando...</div>;
+  if (cargando || !data) return (
+    <div>
+      <SkeletonStats count={4} />
+      <SkeletonTable rows={6} />
+    </div>
+  );
 
   return (
     <div>
@@ -206,8 +213,8 @@ export default function ReporteDevengamientos({ yo, club }: { yo: Usuario; club:
           <div className="field" style={{ flex: '0 0 auto' }}>
             <label>&nbsp;</label>
             <div className="actions">
-              <button onClick={exportarExcelHandler}>📊 Excel</button>
-              <button onClick={exportarPDFHandler}>📄 PDF</button>
+              <button onClick={exportarExcelHandler}><FileSpreadsheet size={16} />Excel</button>
+              <button onClick={exportarPDFHandler}><FileText size={16} />PDF</button>
             </div>
           </div>
         </div>

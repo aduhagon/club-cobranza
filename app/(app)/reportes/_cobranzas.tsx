@@ -6,6 +6,8 @@ import { useToast } from '@/components/Toast';
 import { fmtMoney, fmtDate, fmtMesLargo, thisMonth, formatNumeroRecibo } from '@/lib/utils';
 import { exportarExcel, exportarPDF } from '@/lib/reportes';
 import type { Usuario, Club, Pago, Sucursal, Socio } from '@/lib/types';
+import { FileSpreadsheet, FileText } from 'lucide-react';
+import { SkeletonStats, SkeletonTable } from '@/components/Skeleton';
 
 interface ReporteData {
   pagos: Pago[];
@@ -254,7 +256,12 @@ export default function ReporteCobranzas({ yo, club }: { yo: Usuario; club: Club
     toast.success('PDF descargado');
   }
 
-  if (cargando || !data) return <div className="empty">Cargando...</div>;
+  if (cargando || !data) return (
+    <div>
+      <SkeletonStats count={4} />
+      <SkeletonTable rows={6} />
+    </div>
+  );
 
   const variacion = data.totalAnterior > 0
     ? ((data.total - data.totalAnterior) / data.totalAnterior) * 100
@@ -274,8 +281,8 @@ export default function ReporteCobranzas({ yo, club }: { yo: Usuario; club: Club
           <div className="field" style={{ flex: '0 0 auto' }}>
             <label>&nbsp;</label>
             <div className="actions">
-              <button onClick={exportarExcelHandler}>📊 Excel</button>
-              <button onClick={exportarPDFHandler}>📄 PDF</button>
+              <button onClick={exportarExcelHandler}><FileSpreadsheet size={16} />Excel</button>
+              <button onClick={exportarPDFHandler}><FileText size={16} />PDF</button>
             </div>
           </div>
         </div>

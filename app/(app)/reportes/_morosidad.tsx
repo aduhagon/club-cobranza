@@ -6,6 +6,8 @@ import { useToast } from '@/components/Toast';
 import { fmtMoney, fmtMesLargo } from '@/lib/utils';
 import { exportarExcel, exportarPDF } from '@/lib/reportes';
 import type { Usuario, Club, Devengamiento, TipoCuota, Socio } from '@/lib/types';
+import { FileSpreadsheet, FileText, MessageCircle, Phone, PartyPopper } from 'lucide-react';
+import { SkeletonStats, SkeletonTable } from '@/components/Skeleton';
 
 interface SocioMoroso {
   socio: Socio;
@@ -263,7 +265,12 @@ export default function ReporteMorosidad({ yo, club }: { yo: Usuario; club: Club
     toast.success('PDF descargado');
   }
 
-  if (cargando || !data) return <div className="empty">Cargando...</div>;
+  if (cargando || !data) return (
+    <div>
+      <SkeletonStats count={3} />
+      <SkeletonTable rows={6} />
+    </div>
+  );
 
   return (
     <div>
@@ -296,8 +303,8 @@ export default function ReporteMorosidad({ yo, club }: { yo: Usuario; club: Club
           <div className="field" style={{ flex: '0 0 auto' }}>
             <label>&nbsp;</label>
             <div className="actions">
-              <button onClick={exportarExcelHandler}>📊 Excel</button>
-              <button onClick={exportarPDFHandler}>📄 PDF</button>
+              <button onClick={exportarExcelHandler}><FileSpreadsheet size={16} />Excel</button>
+              <button onClick={exportarPDFHandler}><FileText size={16} />PDF</button>
             </div>
           </div>
         </div>
@@ -320,7 +327,7 @@ export default function ReporteMorosidad({ yo, club }: { yo: Usuario; club: Club
 
       {data.morosos.length === 0 ? (
         <div className="card empty">
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
+          <PartyPopper size={32} style={{ marginBottom: 8, color: 'var(--success)' }} />
           <div>No hay morosos con los filtros aplicados</div>
         </div>
       ) : (
@@ -392,7 +399,7 @@ export default function ReporteMorosidad({ yo, club }: { yo: Usuario; club: Club
                     <td><strong style={{ color: 'var(--danger)' }}>{fmtMoney(m.total)}</strong></td>
                     <td>
                       <button onClick={() => enviarRecordatorio(m)} title="Enviar recordatorio por WhatsApp">
-                        💬
+                        <MessageCircle size={14} />
                       </button>
                     </td>
                   </tr>
@@ -412,11 +419,11 @@ export default function ReporteMorosidad({ yo, club }: { yo: Usuario; club: Club
                   </div>
                   <div className="socio-card-info">Cobrador: {m.cobradorNombre}</div>
                   <div className="socio-card-info">Desde: {fmtMesLargo(m.masAntiguo)}</div>
-                  {m.socio.telefono && <div className="socio-card-info">📞 {m.socio.telefono}</div>}
+                  {m.socio.telefono && <div className="socio-card-info" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={12} /> {m.socio.telefono}</div>}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                     <strong style={{ color: 'var(--danger)', fontSize: 16 }}>{fmtMoney(m.total)}</strong>
                     {m.socio.telefono && (
-                      <button onClick={() => enviarRecordatorio(m)}>💬 WhatsApp</button>
+                      <button onClick={() => enviarRecordatorio(m)}><MessageCircle size={14} />WhatsApp</button>
                     )}
                   </div>
                 </div>

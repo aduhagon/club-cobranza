@@ -8,6 +8,7 @@ import { fmtMoney, fmtDate, fmtMesLargo, formatNumeroRecibo } from '@/lib/utils'
 import { exportarEstadoCuentaPDF, exportarExcel } from '@/lib/reportes';
 import SocioSearchInput from '@/components/SocioSearchInput';
 import type { Usuario, Club, Socio, TipoCuota, Devengamiento, Pago, Sucursal } from '@/lib/types';
+import { FileSpreadsheet, FileText, MessageCircle, Phone, Mail } from 'lucide-react';
 
 interface FilaEstado {
   periodo: string;
@@ -304,8 +305,8 @@ function EstadoCuentaContent() {
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-2)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   {data.socio.dni && <span>DNI: {data.socio.dni}</span>}
-                  {data.socio.telefono && <span>📞 {data.socio.telefono}</span>}
-                  {data.socio.email && <span>✉ {data.socio.email}</span>}
+                  {data.socio.telefono && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Phone size={13} /> {data.socio.telefono}</span>}
+                  {data.socio.email && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Mail size={13} /> {data.socio.email}</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   {data.tipoCuota && <span>Tipo: <strong>{data.tipoCuota.nombre}</strong></span>}
@@ -319,12 +320,12 @@ function EstadoCuentaContent() {
                 </div>
               </div>
               <div className="actions">
-                <button onClick={descargarExcel}>📊 Excel</button>
+                <button onClick={descargarExcel}><FileSpreadsheet size={16} />Excel</button>
                 <button onClick={descargarPDF} disabled={generandoPDF}>
-                  {generandoPDF ? 'Generando...' : '📄 PDF'}
+                  <FileText size={16} />{generandoPDF ? 'Generando...' : 'PDF'}
                 </button>
                 {data.saldoVencido > 0 && data.socio.telefono && (
-                  <button onClick={enviarRecordatorioWA}>💬 Recordatorio</button>
+                  <button onClick={enviarRecordatorioWA}><MessageCircle size={16} />Recordatorio</button>
                 )}
               </div>
             </div>

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fmtDate, todayISO, normalize } from '@/lib/utils';
 import { useToast } from '@/components/Toast';
 import type { Socio, TipoCuota, Usuario } from '@/lib/types';
+import { Phone } from 'lucide-react';
 
 const MOTIVOS_BAJA = ['Renuncia voluntaria', 'Mora prolongada', 'Fallecimiento', 'Traslado', 'Falta de uso', 'Otro'];
 
@@ -256,7 +257,7 @@ export default function SociosPage() {
                       ? <strong>{cobradoresMap.get(s.cobrador_id) || '?'}</strong>
                       : <em style={{ color: 'var(--text-3)' }}>libre</em>}
                   </div>
-                  {s.telefono && <div className="socio-card-info">📞 {s.telefono}</div>}
+                  {s.telefono && <div className="socio-card-info" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={12} /> {s.telefono}</div>}
                   <div className="socio-card-actions">
                     <button onClick={() => router.push(`/estado-cuenta?socio=${s.id}`)}>Estado</button>
                     <button onClick={() => setEditing(s)}>Editar</button>

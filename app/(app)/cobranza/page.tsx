@@ -8,6 +8,7 @@ import ReciboVisual from '@/components/ReciboVisual';
 import SocioSearchInput from '@/components/SocioSearchInput';
 import { useToast } from '@/components/Toast';
 import type { Socio, Sucursal, TipoCuota, Devengamiento, ValorCuota, Pago, Club } from '@/lib/types';
+import { FileText, MessageCircle } from 'lucide-react';
 
 const MEDIOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Débito automático', 'Tarjeta de débito', 'Tarjeta de crédito', 'Cheque'];
 
@@ -628,8 +629,8 @@ function ReciboGeneradoModal({ recibo, club, onClose }: { recibo: ReciboGenerado
           periodos={recibo.periodos} tipoCuotaNombre={recibo.tipoCuotaNombre}
         />
         <div className="actions" style={{ justifyContent: 'center', marginTop: 16 }}>
-          <button onClick={descargarPDF} disabled={descargando}>{descargando ? 'Generando...' : '📄 Descargar PDF'}</button>
-          <button onClick={enviarWhatsapp}>WhatsApp</button>
+          <button onClick={descargarPDF} disabled={descargando}><FileText size={16} />{descargando ? 'Generando...' : 'Descargar PDF'}</button>
+          <button onClick={enviarWhatsapp}><MessageCircle size={16} />WhatsApp</button>
           <button className="primary" onClick={onClose}>Listo</button>
         </div>
       </div>

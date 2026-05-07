@@ -6,6 +6,7 @@ import { useToast } from '@/components/Toast';
 import { fmtMoney, fmtMesLargo } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import type { Usuario, Socio, TipoCuota } from '@/lib/types';
+import { Download } from 'lucide-react';
 
 interface FilaImport {
   fila: number;
@@ -376,7 +377,7 @@ export default function ImportarDeuda() {
           <p style={{ color: 'var(--text-2)', marginBottom: 12, fontSize: 14 }}>
             Cada fila representa una cuota adeudada del socio. Los socios se identifican por DNI.
           </p>
-          <button onClick={descargarPlantilla}>📥 Descargar plantilla Excel</button>
+          <button onClick={descargarPlantilla}><Download size={16} />Descargar plantilla Excel</button>
 
           <h3 style={{ marginTop: 24 }}>2. Subir archivo completo</h3>
           <input

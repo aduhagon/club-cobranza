@@ -1,19 +1,33 @@
-# Cobranza Club v12
+# Cobranza Club v13 - Facelift visual
 
-Importación masiva de deuda histórica:
-- Pantalla "Importar" ahora con dos tabs: Socios + Deuda histórica
-- Plantilla Excel descargable con DNI, período e importe
-- Una fila = una cuota adeudada (formato simple para copy-paste)
-- Validaciones: socio existe + tipo de cuota + período >= alta + sin duplicados
-- Importes específicos por fila (útil cuando la cuota cambió de valor)
-- Importación con saltar errores y seguir
-- Reporte final con detalle de errores fila por fila
-- Total importado en pesos para validación
+Mejoras de UI/UX significativas que elevan la calidad percibida del producto:
 
-Cierra el ciclo de carga inicial. Ya podés migrar el club real con socios + deuda en pocos clicks.
+## Lo nuevo
 
-Más todo lo del v11.1: estado de cuenta detallado, reportes, importación de socios, pagos adelantados, asignación cobrador-socio.
+1. **Tipografía Inter** cargada vía Google Fonts. La app se ve igual en cualquier SO.
+2. **Sistema de spacing tokens** consistente (--space-1 a --space-12, base 4/8).
+3. **Iconos vectoriales** (lucide-react) reemplazan TODOS los emojis. Ahora se ven crisp en cualquier dispositivo.
+4. **Skeletons** en lugar de "Cargando..." para mejor sensación de velocidad.
+5. **Animaciones sutiles**: fadeIn en cards, modalIn en modales, toastIn en toasts, hover/active states pulidos.
+
+## Mejoras adicionales
+
+- **Sidebar reorganizado por secciones**: Operativo / Análisis / Procesos / Configuración
+- **Iconos en cada ítem del menú** (Home, Wallet, Receipt, BarChart, Users, Settings, etc.)
+- **Toast con íconos** lucide en lugar de caracteres
+- **Contraste mejorado** en textos secundarios (de 3.4:1 a 5.2:1, cumple WCAG)
+- **Focus visible** en TODOS los elementos interactivos (accesibilidad por teclado)
+- **prefers-reduced-motion** respetado (usuarios sensibles al movimiento)
+- **Hover states** más sutiles y profesionales
+- **Sombras más finas** y consistentes con el sistema
+- **Botones con altura mínima 36px** (touch-friendly)
+- **Inputs con focus ring** azul difuminado (look moderno)
+
+Todo lo del v12: importación masiva, reportes, estado de cuenta, pagos adelantados, asignación cobrador-socio, identidad del club.
 
 ## Variables de entorno
 - NEXT_PUBLIC_SUPABASE_URL
 - NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+## Nuevas dependencias
+- `lucide-react ^0.344.0` (~20kb, tree-shakeable, instalación automática en Vercel)

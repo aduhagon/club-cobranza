@@ -6,6 +6,7 @@ import { useToast } from '@/components/Toast';
 import { fmtDate, todayISO, normalize } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import type { Usuario, Socio, TipoCuota } from '@/lib/types';
+import { Download } from 'lucide-react';
 
 interface FilaImport {
   fila: number; // 1-indexed para mostrar al usuario (la 1 es el header)
@@ -423,7 +424,7 @@ export default function ImportarSocios() {
             Tipos de cuota actuales: {tipos.map((t) => t.nombre).join(', ') || 'ninguno'}.
             Cobradores: {cobradores.map((c) => c.nombre).join(', ') || 'ninguno'}.
           </p>
-          <button onClick={descargarPlantilla}>📥 Descargar plantilla Excel</button>
+          <button onClick={descargarPlantilla}><Download size={16} />Descargar plantilla Excel</button>
 
           <h3 style={{ marginTop: 24 }}>2. Subir archivo completo</h3>
           <input
