@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { fmtDate, todayISO, normalize } from '@/lib/utils';
 import { useToast } from '@/components/Toast';
@@ -11,6 +12,7 @@ const MOTIVOS_BAJA = ['Renuncia voluntaria', 'Mora prolongada', 'Fallecimiento',
 export default function SociosPage() {
   const supabase = createClient();
   const toast = useToast();
+  const router = useRouter();
   const [socios, setSocios] = useState<Socio[]>([]);
   const [tipos, setTipos] = useState<TipoCuota[]>([]);
   const [cobradores, setCobradores] = useState<Usuario[]>([]);
@@ -221,6 +223,7 @@ export default function SociosPage() {
                     <td>{s.debito_automatico && <span className="badge debito">DA</span>}</td>
                     <td>
                       <div className="actions">
+                        <button onClick={() => router.push(`/estado-cuenta?socio=${s.id}`)}>Estado</button>
                         <button onClick={() => setEditing(s)}>Editar</button>
                         {s.fecha_baja && <button onClick={() => handleReincorporar(s)}>↻</button>}
                       </div>
@@ -255,6 +258,7 @@ export default function SociosPage() {
                   </div>
                   {s.telefono && <div className="socio-card-info">📞 {s.telefono}</div>}
                   <div className="socio-card-actions">
+                    <button onClick={() => router.push(`/estado-cuenta?socio=${s.id}`)}>Estado</button>
                     <button onClick={() => setEditing(s)}>Editar</button>
                     {s.fecha_baja && <button onClick={() => handleReincorporar(s)}>Reincorporar</button>}
                   </div>

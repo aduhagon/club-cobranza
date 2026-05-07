@@ -1,15 +1,15 @@
-# Cobranza Club v10
+# Cobranza Club v11
 
-Reportes con tabs:
-- Cobranzas: total recaudado, por medio de pago, por cobrador, por sucursal, detalle
-- Devengamientos: devengado vs cobrado vs pendiente, tasa de cobranza, por tipo
-- Morosidad: socios morosos, antigüedad de la deuda, recordatorios por WhatsApp
+Estado de cuenta detallado del socio:
+- Pantalla "Estado de cuenta" en el menú con buscador de socio
+- Botón "Estado" en el listado de Socios para acceso rápido
+- Vista mes a mes: período, devengado, pagado, fecha de pago, estado, recibo
+- 4 stats: total devengado, total pagado, saldo, cuotas pendientes
+- Exportable a Excel y PDF (con datos del club listo para mandar al socio)
+- Botón WhatsApp con recordatorio pre-armado si tiene saldo deudor
+- Permisos: admin ve todos los socios, cobrador solo los suyos
 
-Cada reporte se puede ver en pantalla, exportar a Excel o descargar como PDF con logo del club.
-
-Filtros: el cobrador ve solo sus números, el admin ve todo.
-
-Más todo lo de v9: importación masiva, pagos adelantados, asignación cobrador-socio, procesos masivos.
+Más todo lo del v10: reportes, importación masiva, pagos adelantados, asignación cobrador-socio.
 
 ## Variables de entorno
 - NEXT_PUBLIC_SUPABASE_URL
