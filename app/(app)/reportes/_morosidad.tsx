@@ -42,9 +42,12 @@ export default function ReporteMorosidad({ yo, club }: { yo: Usuario; club: Club
 
   async function cargar() {
     setCargando(true);
+    // Mes actual para filtrar: solo cuentan como deuda los devengamientos con período <= mes actual
+    const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
+
     const [sociosRes, devsRes, tiposRes, cobsRes] = await Promise.all([
       supabase.from('socios').select('*').is('fecha_baja', null),
-      supabase.from('devengamientos').select('*').eq('estado', 'pendiente'),
+      supabase.from('devengamientos').select('*').eq('estado', 'pendiente').lte('periodo', mesActual),
       supabase.from('tipos_cuota').select('*'),
       supabase.from('usuarios').select('*').eq('rol', 'cobrador'),
     ]);

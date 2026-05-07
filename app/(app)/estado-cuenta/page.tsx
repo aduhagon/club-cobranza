@@ -28,6 +28,7 @@ interface DataEstado {
   totalDevengado: number;
   totalPagado: number;
   saldo: number;
+  saldoVencido: number;
   cantidadPendientes: number;
 }
 
@@ -136,14 +137,19 @@ function EstadoCuentaContent() {
     const totalDevengado = filas.reduce((s, f) => s + f.devengado, 0);
     const totalPagado = filas.reduce((s, f) => s + f.pagado, 0);
     const saldo = totalDevengado - totalPagado;
-    const cantidadPendientes = filas.filter((f) => f.estado === 'pendiente').length;
+
+    // Cuotas pendientes vencidas (período <= mes actual)
+    const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const filasVencidas = filas.filter((f) => f.estado === 'pendiente' && f.periodo <= mesActual);
+    const cantidadPendientes = filasVencidas.length;
+    const saldoVencido = filasVencidas.reduce((s, f) => s + f.devengado, 0);
 
     const tipoCuota = socio.tipo_cuota_id ? tipos.find((t) => t.id === socio.tipo_cuota_id) || null : null;
     const cobrador = socio.cobrador_id ? cobradores.find((c) => c.id === socio.cobrador_id) || null : null;
 
     setData({
       socio, tipoCuota, cobrador, filas,
-      totalDevengado, totalPagado, saldo, cantidadPendientes,
+      totalDevengado, totalPagado, saldo, saldoVencido, cantidadPendientes,
     });
     setCargandoEstado(false);
   }
@@ -235,13 +241,16 @@ function EstadoCuentaContent() {
   }
 
   function enviarRecordatorioWA() {
-    if (!data || data.saldo <= 0) return;
-    const meses = data.filas.filter((f) => f.estado === 'pendiente').map((f) => fmtMesLargo(f.periodo)).join(', ');
+    if (!data || data.saldoVencido <= 0) return;
+    const mesActual = new Date().toISOString().slice(0, 7);
+    const mesesVencidos = data.filas
+      .filter((f) => f.estado === 'pendiente' && f.periodo <= mesActual)
+      .map((f) => fmtMesLargo(f.periodo)).join(', ');
     const nombreClub = club?.nombre || 'Club';
     const texto =
       `Hola ${data.socio.nombre.split(' ')[0]}, te escribo desde *${nombreClub}*.\n\n` +
-      `Tenés ${data.cantidadPendientes} cuota${data.cantidadPendientes > 1 ? 's' : ''} pendiente${data.cantidadPendientes > 1 ? 's' : ''} (${meses}) ` +
-      `por un total de *${fmtMoney(data.saldo)}*.\n\n` +
+      `Tenés ${data.cantidadPendientes} cuota${data.cantidadPendientes > 1 ? 's' : ''} pendiente${data.cantidadPendientes > 1 ? 's' : ''} (${mesesVencidos}) ` +
+      `por un total de *${fmtMoney(data.saldoVencido)}*.\n\n` +
       `Te pido por favor que regularices tu situación cuando puedas. ¡Gracias!`;
     const tel = (data.socio.telefono || '').replace(/[^0-9]/g, '');
     if (!tel) {
@@ -314,7 +323,7 @@ function EstadoCuentaContent() {
                 <button onClick={descargarPDF} disabled={generandoPDF}>
                   {generandoPDF ? 'Generando...' : '📄 PDF'}
                 </button>
-                {data.saldo > 0 && data.socio.telefono && (
+                {data.saldoVencido > 0 && data.socio.telefono && (
                   <button onClick={enviarRecordatorioWA}>💬 Recordatorio</button>
                 )}
               </div>
@@ -332,14 +341,21 @@ function EstadoCuentaContent() {
               <div className="stat-value success">{fmtMoney(data.totalPagado)}</div>
             </div>
             <div className="stat">
-              <div className="stat-label">Saldo</div>
-              <div className={`stat-value ${data.saldo > 0 ? 'danger' : data.saldo < 0 ? 'success' : ''}`}>
-                {fmtMoney(data.saldo)}
+              <div className="stat-label">Saldo vencido</div>
+              <div className={`stat-value ${data.saldoVencido > 0 ? 'danger' : ''}`}>
+                {fmtMoney(data.saldoVencido)}
               </div>
+              {data.saldo !== data.saldoVencido && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                  Saldo total (con futuras): {fmtMoney(data.saldo)}
+                </div>
+              )}
             </div>
             <div className="stat">
-              <div className="stat-label">Cuotas pendientes</div>
-              <div className="stat-value danger">{data.cantidadPendientes}</div>
+              <div className="stat-label">Cuotas vencidas</div>
+              <div className={`stat-value ${data.cantidadPendientes > 0 ? 'danger' : ''}`}>
+                {data.cantidadPendientes}
+              </div>
             </div>
           </div>
 
@@ -363,48 +379,57 @@ function EstadoCuentaContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.filas.map((f, idx) => (
-                      <tr key={idx}>
-                        <td>{fmtMesLargo(f.periodo)}</td>
-                        <td>{fmtMoney(f.devengado)}</td>
-                        <td>{f.pagado > 0 ? <strong style={{ color: 'var(--success)' }}>{fmtMoney(f.pagado)}</strong> : '—'}</td>
-                        <td>{f.fecha_pago ? fmtDate(f.fecha_pago) : '—'}</td>
-                        <td>
-                          {f.estado === 'pagado' && <span className="badge active">Pagado</span>}
-                          {f.estado === 'pendiente' && <span className="badge deuda">Pendiente</span>}
-                          {f.estado === 'parcial' && <span className="badge warning">Parcial</span>}
-                        </td>
-                        <td className="recibo-num" style={{ fontSize: 12 }}>{f.recibo || '—'}</td>
-                      </tr>
-                    ))}
+                    {data.filas.map((f, idx) => {
+                      const mesActualLocal = new Date().toISOString().slice(0, 7);
+                      const esFuturo = f.estado === 'pendiente' && f.periodo > mesActualLocal;
+                      return (
+                        <tr key={idx} style={esFuturo ? { opacity: 0.6 } : {}}>
+                          <td>{fmtMesLargo(f.periodo)}</td>
+                          <td>{fmtMoney(f.devengado)}</td>
+                          <td>{f.pagado > 0 ? <strong style={{ color: 'var(--success)' }}>{fmtMoney(f.pagado)}</strong> : '—'}</td>
+                          <td>{f.fecha_pago ? fmtDate(f.fecha_pago) : '—'}</td>
+                          <td>
+                            {f.estado === 'pagado' && <span className="badge active">Pagado</span>}
+                            {esFuturo && <span className="badge debito">Futuro</span>}
+                            {f.estado === 'pendiente' && !esFuturo && <span className="badge deuda">Pendiente</span>}
+                          </td>
+                          <td className="recibo-num" style={{ fontSize: 12 }}>{f.recibo || '—'}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
 
                 {/* Mobile */}
                 <div className="mobile-only" style={{ padding: 8 }}>
-                  {data.filas.map((f, idx) => (
-                    <div key={idx} className="pago-card">
-                      <div className="pago-card-head">
-                        <strong>{fmtMesLargo(f.periodo)}</strong>
-                        {f.estado === 'pagado' && <span className="badge active">Pagado</span>}
-                        {f.estado === 'pendiente' && <span className="badge deuda">Pendiente</span>}
-                      </div>
-                      <div className="pago-card-info">
-                        Devengado: <strong>{fmtMoney(f.devengado)}</strong>
-                      </div>
-                      {f.pagado > 0 && (
+                  {data.filas.map((f, idx) => {
+                    const mesActualLocal = new Date().toISOString().slice(0, 7);
+                    const esFuturo = f.estado === 'pendiente' && f.periodo > mesActualLocal;
+                    return (
+                      <div key={idx} className="pago-card" style={esFuturo ? { opacity: 0.6 } : {}}>
+                        <div className="pago-card-head">
+                          <strong>{fmtMesLargo(f.periodo)}</strong>
+                          {f.estado === 'pagado' && <span className="badge active">Pagado</span>}
+                          {esFuturo && <span className="badge debito">Futuro</span>}
+                          {f.estado === 'pendiente' && !esFuturo && <span className="badge deuda">Pendiente</span>}
+                        </div>
                         <div className="pago-card-info">
-                          Pagado: <strong style={{ color: 'var(--success)' }}>{fmtMoney(f.pagado)}</strong>
-                          {f.fecha_pago && <> el {fmtDate(f.fecha_pago)}</>}
+                          Devengado: <strong>{fmtMoney(f.devengado)}</strong>
                         </div>
-                      )}
-                      {f.recibo && (
-                        <div className="pago-card-info" style={{ fontFamily: 'ui-monospace, monospace' }}>
-                          Recibo {f.recibo}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {f.pagado > 0 && (
+                          <div className="pago-card-info">
+                            Pagado: <strong style={{ color: 'var(--success)' }}>{fmtMoney(f.pagado)}</strong>
+                            {f.fecha_pago && <> el {fmtDate(f.fecha_pago)}</>}
+                          </div>
+                        )}
+                        {f.recibo && (
+                          <div className="pago-card-info" style={{ fontFamily: 'ui-monospace, monospace' }}>
+                            Recibo {f.recibo}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
