@@ -16,7 +16,7 @@ export default function ReciboVisual({ pago, sucursal, socio, club, periodos, ti
   return (
     <div className="recibo-preview">
       <div className="head">
-        {club.logo_url && <img src={club.logo_url} alt="Logo" />}
+        {club.logo_url && <img src={club.logo_url} alt="Logo" style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} />}
         <div className="nombre">{club.nombre}</div>
         {club.direccion && <div>{club.direccion}</div>}
         {club.contacto && <div>{club.contacto}</div>}
