@@ -186,7 +186,7 @@ export default function ConfiguracionPage() {
         <h3>Logo</h3>
         <div className="logo-upload">
           <div className="logo-preview">
-            {club?.logo_url ? <img src={club.logo_url} alt="Logo" /> : <span className="placeholder">📷</span>}
+            {club?.logo_url ? <img src={club.logo_url} alt="Logo" style={{ maxWidth: '120px', maxHeight: '120px', objectFit: 'contain' }} /> : <span className="placeholder">📷</span>}
           </div>
           <div className="logo-actions">
             <input
