@@ -21,6 +21,7 @@ import {
   LogOut,
   Menu,
   X,
+  QrCode,
 } from 'lucide-react';
 
 interface Props {
@@ -115,8 +116,18 @@ export default function AppShell({ nombre, rol, club }: Props) {
     },
   ];
 
-  const sections = rol === 'admin' ? sectionsAdmin : rol === 'cobrador' ? sectionsCobrador : sectionsConsulta;
-  const rolLabel = rol === 'admin' ? 'Administrador' : rol === 'cobrador' ? 'Cobrador' : 'Consulta';
+  const sectionsPortero: NavSection[] = [
+    {
+      label: 'Control de acceso',
+      items: [
+        { href: '/', label: 'Inicio', icon: Home },
+        { href: '/socios', label: 'Socios', icon: Users },
+      ],
+    },
+  ];
+
+  const sections = rol === 'admin' ? sectionsAdmin : rol === 'cobrador' ? sectionsCobrador : rol === 'portero' ? sectionsPortero : sectionsConsulta;
+  const rolLabel = rol === 'admin' ? 'Administrador' : rol === 'cobrador' ? 'Cobrador' : rol === 'portero' ? 'Portero' : 'Consulta';
 
   function close() { setOpen(false); }
 

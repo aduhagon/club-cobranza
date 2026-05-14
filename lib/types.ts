@@ -1,4 +1,4 @@
-export type Rol = 'admin' | 'cobrador' | 'consulta';
+export type Rol = 'admin' | 'cobrador' | 'consulta' | 'portero';
 
 export interface Usuario {
   id: string;
@@ -56,6 +56,7 @@ export interface Socio {
   motivo_baja: string | null;
   motivo_baja_otro: string | null;
   debito_automatico: boolean;
+  domicilio: string | null;
 }
 
 export interface Devengamiento {
