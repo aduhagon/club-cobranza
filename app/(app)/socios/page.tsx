@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fmtDate, todayISO, normalize } from '@/lib/utils';
 import { useToast } from '@/components/Toast';
 import type { Socio, TipoCuota, Usuario } from '@/lib/types';
-import { Phone } from 'lucide-react';
+import { Phone, MapPin } from 'lucide-react';
 
 const MOTIVOS_BAJA = ['Renuncia voluntaria', 'Mora prolongada', 'Fallecimiento', 'Traslado', 'Falta de uso', 'Otro'];
 
@@ -133,7 +133,8 @@ export default function SociosPage() {
         normalize(s.nombre).includes(q) ||
         String(s.numero).includes(q) ||
         (s.dni && s.dni.includes(q)) ||
-        (s.telefono && s.telefono.includes(q))
+        (s.telefono && s.telefono.includes(q)) ||
+        (s.domicilio && normalize(s.domicilio).includes(q))
       );
     }
     return true;
@@ -197,6 +198,7 @@ export default function SociosPage() {
                   </th>
                   <th style={{ width: 60 }}>N°</th>
                   <th>Nombre</th>
+                  <th>Domicilio</th>
                   <th style={{ width: 110 }}>DNI</th>
                   <th>Tipo cuota</th>
                   <th>Cobrador</th>
@@ -213,6 +215,7 @@ export default function SociosPage() {
                     </td>
                     <td>{s.numero}</td>
                     <td>{s.nombre}</td>
+                    <td>{s.domicilio || <span style={{ color: 'var(--text-3)' }}>-</span>}</td>
                     <td>{s.dni || '-'}</td>
                     <td>{tiposMap.get(s.tipo_cuota_id || '') || '-'}</td>
                     <td>
@@ -258,6 +261,7 @@ export default function SociosPage() {
                       : <em style={{ color: 'var(--text-3)' }}>libre</em>}
                   </div>
                   {s.telefono && <div className="socio-card-info" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={12} /> {s.telefono}</div>}
+                  {s.domicilio && <div className="socio-card-info" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={12} /> {s.domicilio}</div>}
                   <div className="socio-card-actions">
                     <button onClick={() => router.push(`/estado-cuenta?socio=${s.id}`)}>Estado</button>
                     <button onClick={() => setEditing(s)}>Editar</button>
@@ -340,7 +344,7 @@ function SocioForm({ socio, tipos, cobradores, onClose, onSave, onBaja }: {
 }) {
   const toast = useToast();
   const [data, setData] = useState<Partial<Socio>>(
-    socio || { nombre: '', dni: '', telefono: '', email: '', tipo_cuota_id: '', cobrador_id: null, fecha_alta: todayISO(), debito_automatico: false }
+    socio || { nombre: '', dni: '', telefono: '', email: '', domicilio: '', tipo_cuota_id: '', cobrador_id: null, fecha_alta: todayISO(), debito_automatico: false }
   );
   const [bajaMode, setBajaMode] = useState(false);
   const [bajaFecha, setBajaFecha] = useState(todayISO());
@@ -408,6 +412,10 @@ function SocioForm({ socio, tipos, cobradores, onClose, onSave, onBaja }: {
         <div className="field">
           <label>Email</label>
           <input type="email" value={data.email || ''} onChange={(e) => setData({ ...data, email: e.target.value })} />
+        </div>
+        <div className="field">
+          <label>Domicilio</label>
+          <input type="text" value={data.domicilio || ''} onChange={(e) => setData({ ...data, domicilio: e.target.value })} placeholder="Calle, número, barrio..." />
         </div>
         <div className="row">
           <div className="field">
